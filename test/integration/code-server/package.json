@@ -1,0 +1,2 @@
+{ "name": "gaanim-test-runner", "publisher": "test", "version": "0.0.1", "license": "MIT", "repository": "none",
+  "engines": { "vscode": "^1.90.0" }, "main": "./main.js", "activationEvents": ["onStartupFinished"] }

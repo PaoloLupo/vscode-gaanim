@@ -1,0 +1,17 @@
+{
+  "Gaanim script section": {
+    "prefix": "gsec",
+    "description": "The script of a slide or voiceover, with a stop mark",
+    "body": ["## ${1:Name}", "", "$0", "", "[stop${2: name}]", ""]
+  },
+  "Gaanim stop mark": {
+    "prefix": "gstop",
+    "description": "Where the speaker advances",
+    "body": ["[stop${1: name}]"]
+  },
+  "Gaanim private note": {
+    "prefix": "gnote",
+    "description": "A heading for the author; it is not read",
+    "body": ["### ${1:note}"]
+  }
+}

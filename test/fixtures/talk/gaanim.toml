@@ -1,0 +1,9 @@
+name = "talk"
+kind = "slides"
+entry = "main.py"
+assets_dir = "assets"
+output_dir = "exports"
+language = "en-US"
+
+[polls]
+relay = "https://example.invalid"

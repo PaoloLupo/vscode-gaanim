@@ -1,0 +1,983 @@
+{
+  "name": "gaanim",
+  "displayName": "Gaanim",
+  "description": "Write Gaanim videos and slides: a live preview that follows your code, times in the code, the narration script beside it, checks, exports and presenting.",
+  "version": "0.13.0",
+  "publisher": "paololupo",
+  "license": "MIT OR Apache-2.0",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PaoloLupo/vscode-gaanim"
+  },
+  "homepage": "https://paololupo.github.io/gaanim/",
+  "bugs": "https://github.com/PaoloLupo/vscode-gaanim/issues",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "gaanim",
+    "animation",
+    "slides",
+    "presentation",
+    "manim",
+    "typst"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:markdown",
+    "workspaceContains:**/gaanim.toml",
+    "onUri"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Gaanim runs the scene's Python script to preview, check and export it."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "gaanim.new",
+        "title": "New Project…",
+        "category": "Gaanim",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "gaanim.openProject",
+        "title": "Open Project…",
+        "category": "Gaanim",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "gaanim.preview",
+        "title": "Open Preview",
+        "category": "Gaanim",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "gaanim.previewHere",
+        "title": "Preview at Cursor",
+        "category": "Gaanim",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "gaanim.previewOnly",
+        "title": "Preview Only the Slide at Cursor",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.follow",
+        "title": "Toggle Preview Follows Cursor",
+        "category": "Gaanim",
+        "icon": "$(link)"
+      },
+      {
+        "command": "gaanim.live",
+        "title": "Toggle Live Mode",
+        "category": "Gaanim",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "gaanim.loop",
+        "title": "Toggle Loop of the Slide at Cursor",
+        "category": "Gaanim",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gaanim.loopPick",
+        "title": "Loop a Slide or Range…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.seek",
+        "title": "Move Preview To…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.play",
+        "title": "Play Preview",
+        "category": "Gaanim",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gaanim.pause",
+        "title": "Pause Preview",
+        "category": "Gaanim",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "gaanim.togglePlay",
+        "title": "Play or Pause Preview",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.present",
+        "title": "Present…",
+        "category": "Gaanim",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "gaanim.presentHere",
+        "title": "Present from Cursor",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.stop",
+        "title": "Close Preview",
+        "category": "Gaanim",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gaanim.check",
+        "title": "Check Project",
+        "category": "Gaanim",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "gaanim.export",
+        "title": "Export…",
+        "category": "Gaanim",
+        "icon": "$(export)"
+      },
+      {
+        "command": "gaanim.exportSlide",
+        "title": "Export the Slide at Cursor…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.still",
+        "title": "Export Still at Cursor",
+        "category": "Gaanim",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "gaanim.stillPick",
+        "title": "Export Still at Marker or Time…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.outline",
+        "title": "Go to Slide, Stop or Marker…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.timeline",
+        "title": "Go to Timeline Entry…",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.refreshTimeline",
+        "title": "Refresh Timeline",
+        "category": "Gaanim",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gaanim.script",
+        "title": "Open Narration Script Beside",
+        "category": "Gaanim",
+        "icon": "$(book)"
+      },
+      {
+        "command": "gaanim.scriptGoto",
+        "title": "Go Between Slide and Its Script",
+        "category": "Gaanim",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "gaanim.scriptToCode",
+        "title": "Add the Script's Missing Slides to the Code",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.nextSlide",
+        "title": "Next Slide",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.prevSlide",
+        "title": "Previous Slide",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.nextStop",
+        "title": "Next Stop",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.prevStop",
+        "title": "Previous Stop",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.nudgeUp",
+        "title": "Increase Number",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.nudgeDown",
+        "title": "Decrease Number",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.docs",
+        "title": "Search Documentation…",
+        "category": "Gaanim",
+        "icon": "$(book)"
+      },
+      {
+        "command": "gaanim.api",
+        "title": "Open API Entry at Cursor",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.log",
+        "title": "Show Log",
+        "category": "Gaanim",
+        "icon": "$(output)"
+      },
+      {
+        "command": "gaanim.doctor",
+        "title": "Check Setup",
+        "category": "Gaanim",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "gaanim.useProjectPython",
+        "title": "Use the Project's Python Environment",
+        "category": "Gaanim"
+      },
+      {
+        "command": "gaanim.refreshProjects",
+        "title": "Refresh Projects",
+        "category": "Gaanim",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gaanim.entry.preview",
+        "title": "Preview Here",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "gaanim.entry.loop",
+        "title": "Loop This Slide",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gaanim.entry.still",
+        "title": "Export Still Here",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "gaanim.entry.exportSlide",
+        "title": "Export This Slide…",
+        "icon": "$(export)"
+      },
+      {
+        "command": "gaanim.entry.script",
+        "title": "Open Its Script",
+        "icon": "$(book)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gaanim.entry.preview",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.entry.loop",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.entry.still",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.entry.exportSlide",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.entry.script",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.refreshProjects",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.nudgeUp",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.nudgeDown",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.nextSlide",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.prevSlide",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.nextStop",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.prevStop",
+          "when": "editorLangId == python"
+        },
+        {
+          "command": "gaanim.scriptToCode",
+          "when": "gaanim.inProject"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gaanim.previewHere",
+          "when": "gaanim.inProject && editorLangId == python && !gaanim.previewRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gaanim.stop",
+          "when": "gaanim.inProject && gaanim.previewRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gaanim.script",
+          "when": "gaanim.inProject && editorLangId == python",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "gaanim.previewHere",
+          "when": "gaanim.inProject && editorLangId == python",
+          "group": "gaanim@1"
+        },
+        {
+          "command": "gaanim.still",
+          "when": "gaanim.inProject && editorLangId == python",
+          "group": "gaanim@2"
+        },
+        {
+          "command": "gaanim.exportSlide",
+          "when": "gaanim.inProject && editorLangId == python",
+          "group": "gaanim@3"
+        },
+        {
+          "command": "gaanim.scriptGoto",
+          "when": "gaanim.inProject",
+          "group": "gaanim@4"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "gaanim.togglePlay",
+          "when": "view == gaanim.timeline && gaanim.previewRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gaanim.previewHere",
+          "when": "view == gaanim.timeline && !gaanim.previewRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gaanim.follow",
+          "when": "view == gaanim.timeline",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gaanim.refreshTimeline",
+          "when": "view == gaanim.timeline",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gaanim.export",
+          "when": "view == gaanim.timeline",
+          "group": "1_export@1"
+        },
+        {
+          "command": "gaanim.present",
+          "when": "view == gaanim.timeline",
+          "group": "1_export@2"
+        },
+        {
+          "command": "gaanim.check",
+          "when": "view == gaanim.timeline",
+          "group": "1_export@3"
+        },
+        {
+          "command": "gaanim.new",
+          "when": "view == gaanim.projects",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gaanim.refreshProjects",
+          "when": "view == gaanim.projects",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gaanim.entry.preview",
+          "when": "view == gaanim.timeline && viewItem =~ /^gaanim\\./",
+          "group": "inline@1"
+        },
+        {
+          "command": "gaanim.entry.loop",
+          "when": "view == gaanim.timeline && viewItem =~ /slide/",
+          "group": "inline@2"
+        },
+        {
+          "command": "gaanim.entry.still",
+          "when": "view == gaanim.timeline && viewItem =~ /^gaanim\\./",
+          "group": "1_entry@1"
+        },
+        {
+          "command": "gaanim.entry.exportSlide",
+          "when": "view == gaanim.timeline && viewItem =~ /slide/",
+          "group": "1_entry@2"
+        },
+        {
+          "command": "gaanim.entry.script",
+          "when": "view == gaanim.timeline && viewItem =~ /slide|voiceover/",
+          "group": "1_entry@3"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "gaanim.previewHere",
+        "key": "ctrl+alt+g p",
+        "mac": "cmd+alt+g p",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.follow",
+        "key": "ctrl+alt+g f",
+        "mac": "cmd+alt+g f",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.live",
+        "key": "ctrl+alt+g l",
+        "mac": "cmd+alt+g l",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.loop",
+        "key": "ctrl+alt+g r",
+        "mac": "cmd+alt+g r",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.togglePlay",
+        "key": "ctrl+alt+g space",
+        "mac": "cmd+alt+g space",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.still",
+        "key": "ctrl+alt+g i",
+        "mac": "cmd+alt+g i",
+        "when": "gaanim.inProject && editorLangId == python"
+      },
+      {
+        "command": "gaanim.script",
+        "key": "ctrl+alt+g t",
+        "mac": "cmd+alt+g t",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.scriptGoto",
+        "key": "ctrl+alt+g g",
+        "mac": "cmd+alt+g g",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.check",
+        "key": "ctrl+alt+g c",
+        "mac": "cmd+alt+g c",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.export",
+        "key": "ctrl+alt+g e",
+        "mac": "cmd+alt+g e",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.timeline",
+        "key": "ctrl+alt+g s",
+        "mac": "cmd+alt+g s",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.present",
+        "key": "ctrl+alt+g shift+p",
+        "mac": "cmd+alt+g shift+p",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.stop",
+        "key": "ctrl+alt+g q",
+        "mac": "cmd+alt+g q",
+        "when": "gaanim.inProject"
+      },
+      {
+        "command": "gaanim.api",
+        "key": "ctrl+alt+g k",
+        "mac": "cmd+alt+g k",
+        "when": "gaanim.inProject && editorLangId == python"
+      },
+      {
+        "command": "gaanim.nextSlide",
+        "key": "ctrl+alt+g down",
+        "mac": "cmd+alt+g down",
+        "when": "gaanim.inProject && editorTextFocus && editorLangId == python"
+      },
+      {
+        "command": "gaanim.prevSlide",
+        "key": "ctrl+alt+g up",
+        "mac": "cmd+alt+g up",
+        "when": "gaanim.inProject && editorTextFocus && editorLangId == python"
+      },
+      {
+        "command": "gaanim.nudgeUp",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a",
+        "when": "gaanim.inProject && editorTextFocus && editorLangId == python"
+      },
+      {
+        "command": "gaanim.nudgeDown",
+        "key": "ctrl+alt+x",
+        "mac": "cmd+alt+x",
+        "when": "gaanim.inProject && editorTextFocus && editorLangId == python"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gaanim",
+          "title": "Gaanim",
+          "icon": "images/activity.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "gaanim-panel",
+          "title": "Gaanim",
+          "icon": "images/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "gaanim": [
+        {
+          "id": "gaanim.timeline",
+          "name": "Timeline",
+          "contextualTitle": "Gaanim"
+        },
+        {
+          "id": "gaanim.projects",
+          "name": "Projects",
+          "contextualTitle": "Gaanim",
+          "visibility": "collapsed"
+        }
+      ],
+      "gaanim-panel": [
+        {
+          "id": "gaanim.scrubber",
+          "type": "webview",
+          "name": "Preview Timeline"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "gaanim.timeline",
+        "contents": "Open a Gaanim script or project to see its slides, stops and markers here.\n[New Project](command:gaanim.new)\n[Open Project](command:gaanim.openProject)\n[Check Setup](command:gaanim.doctor)",
+        "when": "!gaanim.inProject"
+      },
+      {
+        "view": "gaanim.projects",
+        "contents": "Set `gaanim.projectsDir` to list your projects here.\n[Open Settings](command:workbench.action.openSettings?%5B%22gaanim.projectsDir%22%5D)\n[New Project](command:gaanim.new)"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "python",
+        "path": "./snippets/python.json"
+      },
+      {
+        "language": "markdown",
+        "path": "./snippets/markdown.json"
+      }
+    ],
+    "colors": [
+      {
+        "id": "gaanim.playheadBackground",
+        "description": "Background of the line the preview rests at.",
+        "defaults": {
+          "dark": "#3794ff26",
+          "light": "#0066bf1f",
+          "highContrast": "#3794ff40"
+        }
+      },
+      {
+        "id": "gaanim.playheadForeground",
+        "description": "Text after the line the preview rests at.",
+        "defaults": {
+          "dark": "#3794ff",
+          "light": "#0066bf",
+          "highContrast": "#3794ff"
+        }
+      },
+      {
+        "id": "gaanim.animatingBackground",
+        "description": "Background of the lines whose play animates while the preview plays.",
+        "defaults": {
+          "dark": "#89d18526",
+          "light": "#38803626",
+          "highContrast": "#89d18540"
+        }
+      },
+      {
+        "id": "gaanim.paceOk",
+        "description": "A slide's script fits its target time.",
+        "defaults": {
+          "dark": "#89d185",
+          "light": "#388a34",
+          "highContrast": "#89d185"
+        }
+      },
+      {
+        "id": "gaanim.paceTight",
+        "description": "A slide's script runs up to 15 % over its target time.",
+        "defaults": {
+          "dark": "#cca700",
+          "light": "#bf8803",
+          "highContrast": "#cca700"
+        }
+      },
+      {
+        "id": "gaanim.paceOver",
+        "description": "A slide's script runs more than 15 % over its target time.",
+        "defaults": {
+          "dark": "#f14c4c",
+          "light": "#e51400",
+          "highContrast": "#f14c4c"
+        }
+      },
+      {
+        "id": "gaanim.paceNone",
+        "description": "A slide's spoken time when it has no target.",
+        "defaults": {
+          "dark": "#9d9d9d",
+          "light": "#717171",
+          "highContrast": "#ffffff"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Gaanim",
+      "properties": {
+        "gaanim.path": {
+          "type": "string",
+          "default": "gaanim",
+          "scope": "machine-overridable",
+          "markdownDescription": "The `gaanim` executable: a name on `PATH` or a full path."
+        },
+        "gaanim.projectsDir": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Where **New Project** creates projects and the Projects view looks. `~` is your home folder."
+        },
+        "gaanim.new.git": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run git init in a new project."
+        },
+        "gaanim.new.openIn": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "currentWindow",
+            "newWindow"
+          ],
+          "default": "ask",
+          "description": "Where a new or picked project opens."
+        },
+        "gaanim.preview.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments for every preview."
+        },
+        "gaanim.preview.editor": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Make Gaanim's *Open in the editor* (inspector, console, animation timeline, error panel, *Open and complete*) open the line in this window, through `GAANIM_EDITOR`."
+        },
+        "gaanim.preview.editorCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The `GAANIM_EDITOR` command given to previews, with `{file}` and `{line}`. Empty finds this editor's command line tool, else opens lines through a `vscode://` link."
+        },
+        "gaanim.preview.listen": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Drive the preview through `--listen stdio` when Gaanim has it: preview at the cursor without a restart, follow the cursor, show the playhead."
+        },
+        "gaanim.preview.marker": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mark the line the preview rests at."
+        },
+        "gaanim.preview.animating": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight the lines whose play animates while the preview plays."
+        },
+        "gaanim.preview.followDelay": {
+          "type": "number",
+          "default": 120,
+          "minimum": 0,
+          "description": "Milliseconds the cursor settles before a following preview moves."
+        },
+        "gaanim.preview.followScript": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep the narration script on the slide the preview shows."
+        },
+        "gaanim.present.duration": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Planned length of a presentation (`20m`, `1h`), counted down in Presenter View. Empty uses the scene's `slides.target()`."
+        },
+        "gaanim.present.monitor": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "description": "Monitor index to present on; empty asks the system."
+        },
+        "gaanim.check.onSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Run `gaanim check` when a project file is saved."
+        },
+        "gaanim.check.strict": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Pass `--strict` to `gaanim check`."
+        },
+        "gaanim.check.debounce": {
+          "type": "number",
+          "default": 400,
+          "minimum": 0,
+          "description": "Milliseconds to wait after the last save before checking."
+        },
+        "gaanim.check.revealProblems": {
+          "type": "string",
+          "enum": [
+            "errors",
+            "always",
+            "never"
+          ],
+          "default": "never",
+          "description": "When a check opens the Problems panel."
+        },
+        "gaanim.export.open": {
+          "type": "string",
+          "enum": [
+            "never",
+            "stills",
+            "always"
+          ],
+          "enumDescriptions": [
+            "Only offer to open the file.",
+            "Open stills beside the code; offer the rest.",
+            "Open every export when it finishes."
+          ],
+          "default": "stills",
+          "description": "What happens when an export finishes."
+        },
+        "gaanim.export.presets": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Extra or changed export presets, merged over the built-in ones (`mp4`, `draft`, `production`, `webm`, `mov`, `gif`, `webp`, `pdf`, `notes`, `bundle`, `web`, `still`). Each is `{ \"ext\": \"mp4\", \"args\": [\"--quality\", \"draft\"], \"desc\": \"…\" }`; `null` removes one.",
+          "additionalProperties": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "ext": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "desc": {
+                "type": "string"
+              },
+              "ask": {
+                "type": "string",
+                "enum": [
+                  "frame"
+                ]
+              }
+            }
+          }
+        },
+        "gaanim.script.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Narration script relative to the project root. Empty finds `narration/script.md` the way Gaanim does."
+        },
+        "gaanim.script.wpm": {
+          "type": "number",
+          "default": 150,
+          "minimum": 60,
+          "description": "Words per minute used to estimate how long a script takes to say."
+        },
+        "gaanim.script.follow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scroll the open narration script to the slide under the cursor."
+        },
+        "gaanim.script.timing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show each section's spoken time against its slide's target in the script."
+        },
+        "gaanim.outline.patterns": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Extra patterns for a project's own way of naming slides: `{ \"kind\": \"segment\", \"pattern\": \"\\\\nNAME\\\\s*=\\\\s*\\\"([^\\\"]+)\\\"\" }`. A JavaScript regular expression whose first group is the name.",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "pattern"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "segment",
+                  "section",
+                  "stop",
+                  "marker",
+                  "voiceover"
+                ]
+              },
+              "pattern": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "gaanim.outline.ignore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".venv",
+            "venv",
+            ".git",
+            "__pycache__",
+            "exports",
+            "snapshots",
+            "node_modules",
+            ".ruff_cache"
+          ],
+          "description": "Folder names never scanned for scripts, assets or projects."
+        },
+        "gaanim.inlayHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the time of each play, stop, segment, marker and voiceover at the end of its line."
+        },
+        "gaanim.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Preview, Loop, Still, script and time lenses over each slide and voiceover."
+        },
+        "gaanim.assets.diagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn about asset names that resolve to no file."
+        },
+        "gaanim.takes.diagnostics": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Tell where each `vo.wait_until(\"…\")` lands: in the take's transcript, estimated from the script, or nowhere."
+        },
+        "gaanim.typst.completion": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Complete Typst math symbols and functions inside `equation(...)` strings and `$...$`."
+        },
+        "gaanim.live.delay": {
+          "type": "number",
+          "default": 700,
+          "minimum": 100,
+          "description": "Milliseconds after the last change before live mode saves the file."
+        },
+        "gaanim.live.quiet": {
+          "type": "boolean",
+          "default": true,
+          "description": "In live mode, show a failed reload only as a problem, without a notification."
+        },
+        "gaanim.python.useProjectEnvironment": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "always",
+            "never"
+          ],
+          "default": "ask",
+          "markdownDescription": "Point the Python extension at the project's `.venv`, where `gaanim init` installed the authoring package and its type stubs."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test \"out/test/**/*.test.js\"",
+    "package": "node esbuild.mjs --production && vsce package --no-dependencies",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "test:integration": "node esbuild.mjs && tsc -p tsconfig.test.json && node out/test/integration/run.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "3.6.0",
+    "esbuild": "0.25.8",
+    "typescript": "5.8.3"
+  }
+}

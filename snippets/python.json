@@ -1,0 +1,79 @@
+{
+  "Gaanim slides scene": {
+    "prefix": "gslides",
+    "description": "A slides project: themed scene, two segments and render()",
+    "body": [
+      "from gaanim import Scene, Transition, lecture, title_slide",
+      "",
+      "scene = Scene(theme=\"presentation\")",
+      "scene.assets.load_project()",
+      "S = scene.slides",
+      "S.target(${1:10} * 60)",
+      "",
+      "cover = scene.segment(\"${2:Cover}\", template=title_slide, target=${3:30})",
+      "title = scene.text(\"${4:Title}\", role=\"title\")",
+      "cover.bind(title=title, subtitle=scene.text(\"${5:Subtitle}\", role=\"subtitle\"))",
+      "scene.play([title.animate.write().duration(0.8)])",
+      "scene.stop(\"${6:title}\")",
+      "",
+      "$0",
+      "",
+      "scene.render()"
+    ]
+  },
+  "Gaanim video scene": {
+    "prefix": "gvideo",
+    "description": "A video scene with a voiceover block and render()",
+    "body": [
+      "from gaanim import Scene",
+      "",
+      "scene = Scene()",
+      "scene.assets.load_project()",
+      "",
+      "with scene.voiceover(\"${1:intro}\") as vo:",
+      "    $0",
+      "",
+      "scene.render()"
+    ]
+  },
+  "Gaanim segment": {
+    "prefix": "gseg",
+    "description": "A slide: segment with a transition, template and target time",
+    "body": [
+      "${1:slide} = scene.segment(\"${2:Name}\", Transition.${3|slide(0.5, \"left\"),cross_fade(0.5),wipe(0.5)|}, template=${4|lecture,title_slide,comparison,minimal|}, target=${5:60})",
+      "$1.bind(title=scene.text(\"${6:Title}\", role=\"title\"), ${7:body}=$8)",
+      "$0",
+      "scene.stop(\"${9:end}\")"
+    ]
+  },
+  "Gaanim stop": {
+    "prefix": "gstop",
+    "description": "Wait for the speaker to advance",
+    "body": ["scene.stop(\"${1:name}\")"]
+  },
+  "Gaanim play": {
+    "prefix": "gplay",
+    "description": "Play animations together",
+    "body": ["scene.play([${1:obj}.animate.${2|fade_in,write,create,grow_from_center,fade_out|}().duration(${3:0.6})])"]
+  },
+  "Gaanim voiceover": {
+    "prefix": "gvo",
+    "description": "A block timed by the narration take of a key",
+    "body": [
+      "with scene.voiceover(\"${1:key}\") as vo:",
+      "    ${2:scene.play([obj.animate.fade_in()])}",
+      "    vo.wait_until(\"${3:word}\")",
+      "    $0"
+    ]
+  },
+  "Gaanim marker": {
+    "prefix": "gmark",
+    "description": "Name this instant for exports (--from, --to, --frame)",
+    "body": ["scene.marker(\"${1:name}\")"]
+  },
+  "Gaanim wait": {
+    "prefix": "gwait",
+    "description": "Hold for some seconds",
+    "body": ["scene.wait(${1:1})"]
+  }
+}
