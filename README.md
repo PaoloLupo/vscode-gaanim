@@ -1,3 +1,5 @@
+![Gaanim for VS Code](images/banner.png)
+
 # Gaanim for VS Code
 
 Write [Gaanim](https://paololupo.github.io/gaanim/) videos and slides in VS

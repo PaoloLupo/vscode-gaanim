@@ -90,26 +90,32 @@ function html(nonce: string, csp: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style nonce="${nonce}">
   :root { color-scheme: light dark; }
-  body { margin: 0; padding: 6px 10px 10px; font: var(--vscode-font-size) var(--vscode-font-family); color: var(--vscode-foreground); background: transparent; }
-  header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 2px 8px; border-radius: 3px; cursor: pointer; font: inherit; }
-  button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  button.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  /* Gaanim's palette (docs/assets/brand in the Gaanim repository). The current frame, here the playhead, is gold on dark and ink on light. */
+  body { --gaanim-frame: #7C6CFF; --gaanim-accent: #A99FFF; --gaanim-on-accent: #14112E; --gaanim-gold: #FFC933; --gaanim-now: #FFC933; }
+  body.vscode-light, body.vscode-high-contrast-light { --gaanim-accent: #5B4AF0; --gaanim-on-accent: #FFFFFF; --gaanim-gold: #F0A800; --gaanim-now: #14112E; }
+  body { --line: color-mix(in srgb, var(--vscode-foreground) 14%, transparent); margin: 0; padding: 6px 10px 10px; font: var(--vscode-font-size) var(--vscode-font-family); color: var(--vscode-foreground); background: transparent; }
+  header { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+  button { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: transparent; color: var(--vscode-foreground); padding: 2px 8px; border-radius: 0; cursor: pointer; font: inherit; }
+  button:hover { background: color-mix(in srgb, var(--gaanim-frame) 14%, transparent); }
+  button.on { background: var(--gaanim-accent); border-color: var(--gaanim-accent); color: var(--gaanim-on-accent); }
   button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
-  .readout { font-variant-numeric: tabular-nums; margin-left: auto; opacity: .85; }
+  .readout { font-family: var(--vscode-editor-font-family); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: auto; opacity: .85; }
   .state-failed { color: var(--vscode-errorForeground); }
-  .track { position: relative; height: 54px; border-radius: 4px; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, transparent); cursor: pointer; overflow: hidden; user-select: none; }
-  .seg { position: absolute; top: 0; height: 30px; box-sizing: border-box; border-right: 1px solid var(--vscode-editor-background); padding: 3px 5px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--vscode-charts-blue); color: var(--vscode-editor-background); opacity: .55; }
-  .seg:nth-child(even) { opacity: .4; }
-  .seg.current { opacity: .9; }
-  .stop, .marker { position: absolute; top: 30px; width: 0; height: 10px; border-left: 2px solid var(--vscode-charts-orange); }
-  .marker { border-left-color: var(--vscode-charts-purple); height: 14px; }
-  .vo { position: absolute; top: 44px; height: 6px; border-radius: 3px; background: var(--vscode-charts-green); opacity: .7; }
-  .loop { position: absolute; top: 0; bottom: 0; background: var(--vscode-charts-yellow); opacity: .18; pointer-events: none; }
-  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--vscode-editorCursor-foreground, var(--vscode-foreground)); pointer-events: none; }
+  .track { position: relative; height: 60px; background: var(--vscode-editorWidget-background); border: 1px solid var(--line); cursor: pointer; overflow: hidden; user-select: none; }
+  .track::before { content: ""; position: absolute; left: 0; right: 0; top: 41px; height: 1px; background: var(--line); }
+  .seg { position: absolute; top: 0; height: 28px; box-sizing: border-box; padding: 7px 6px 0; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--gaanim-frame) 8%, transparent); font: 11px var(--vscode-editor-font-family); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .75; }
+  .seg::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--gaanim-frame); opacity: .4; }
+  .seg.current { background: color-mix(in srgb, var(--gaanim-frame) 22%, transparent); opacity: 1; }
+  .seg.current::before { height: 3px; opacity: 1; }
+  .stop { position: absolute; top: 38px; width: 7px; height: 7px; margin-left: -3px; background: var(--gaanim-accent); }
+  .marker { position: absolute; top: 38px; width: 5px; height: 5px; margin-left: -3px; border: 1.5px solid var(--gaanim-accent); transform: rotate(45deg); background: var(--vscode-editorWidget-background); }
+  .vo { position: absolute; top: 51px; height: 4px; background: color-mix(in srgb, var(--gaanim-accent) 45%, transparent); }
+  .loop { position: absolute; top: 0; bottom: 0; box-sizing: border-box; border-left: 2px solid var(--gaanim-gold); border-right: 2px solid var(--gaanim-gold); background: color-mix(in srgb, var(--gaanim-gold) 8%, transparent); pointer-events: none; }
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--gaanim-now); pointer-events: none; }
+  .playhead::before { content: ""; position: absolute; top: 0; left: -3px; width: 8px; height: 8px; background: var(--gaanim-now); }
   .hover { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--vscode-foreground); opacity: .3; pointer-events: none; display: none; }
   .empty { opacity: .75; padding: 8px 0; }
-  .legend { margin-top: 6px; font-size: 11px; opacity: .7; }
+  .legend { margin-top: 6px; font-size: 11px; opacity: .6; }
 </style>
 </head>
 <body>
@@ -117,7 +123,7 @@ function html(nonce: string, csp: string): string {
   <button id="toggle" title="Play or pause the preview">▶ Play</button>
   <button id="loop" title="Loop the slide at the playhead">⟲ Loop</button>
   <button id="follow" title="The preview follows the cursor">⇄ Follow</button>
-  <button id="live" title="Save as you type so the preview shows each change">⚡ Live</button>
+  <button id="live" title="Save as you type so the preview shows each change">● Live</button>
   <button id="still" title="Export the PNG of the cursor's line">▣ Still</button>
   <span id="readout" class="readout"></span>
 </header>
