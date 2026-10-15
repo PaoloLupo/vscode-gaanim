@@ -62,7 +62,8 @@ También vale `npm run package` e instalar el `.vsix` resultante
    corrigió que en Windows el `gaanim` falso va envuelto en un `.cmd`, que
    los `.cmd` se lanzan con el programa y los argumentos entre comillas
    (`src/core/spawn.ts`) y que el aviso *Exported …* ya no bloquea el
-   comando. Falta pasarla en Linux y macOS. Se ejecuta con:
+   comando. En CI pasa también en Linux y macOS con el `gaanim` falso. Se
+   ejecuta con:
 
    ```bash
    npm run test:integration        # descarga VS Code y usa el gaanim falso
@@ -111,8 +112,11 @@ También vale `npm run package` e instalar el `.vsix` resultante
 
 ## 4. Cosas por decidir o mejorar
 
-- **CI**: añadir un workflow de GitHub Actions con `npm ci`, `npm test` y
-  `npm run package` (y quizá `npm run test:integration` con `xvfb-run`).
+- **CI**: `.github/workflows/ci.yml` corre en Linux, Windows y macOS
+  typecheck, pruebas unitarias, la suite de integración con el `gaanim`
+  falso (con `xvfb-run` en Linux) y `npm run package`, y sube el `.vsix`
+  desde Linux. La suite con el Gaanim real no está en CI: su vista previa
+  necesita GPU (o lavapipe) y el binario de Gaanim.
 - **Publicar** en el Marketplace y en Open VSX con el publisher `paololupo`
   (crear el publisher y un token; `npx vsce publish`, `npx ovsx publish`).
 - **Icono**: `images/icon.png` es una copia de
