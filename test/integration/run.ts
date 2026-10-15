@@ -10,9 +10,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { runTests } from "@vscode/test-electron";
 
+/**
+ * The stand-in gaanim. Windows does not run a script from its shebang, so
+ * there it is wrapped in a `.cmd`, which also exercises a gaanim.path that is
+ * a batch file.
+ */
+function fakeGaanim(extension: string, work: string): string {
+  const script = path.join(extension, "test", "integration", "fake-gaanim.js");
+  if (process.platform !== "win32") {
+    return script;
+  }
+  const wrapper = path.join(work, "fake-gaanim.cmd");
+  fs.writeFileSync(wrapper, `@"${process.execPath}" "${script}" %*\r\n`);
+  return wrapper;
+}
+
 async function main(): Promise<void> {
   const extension = path.resolve(__dirname, "..", "..", "..");
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), "gaanim-vscode-"));
+  // The space checks that paths with spaces reach gaanim whole.
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "gaanim vscode-"));
   const real = process.env.GAANIM_TEST_BIN;
   const source = real ? process.env.GAANIM_TEST_PROJECT : path.join(extension, "test", "fixtures", "talk");
   if (!source) {
@@ -20,7 +36,7 @@ async function main(): Promise<void> {
   }
   const project = path.join(work, "talk");
   fs.cpSync(source, project, { recursive: true, verbatimSymlinks: true });
-  const bin = real ?? path.join(extension, "test", "integration", "fake-gaanim.js");
+  const bin = real ?? fakeGaanim(extension, work);
   fs.mkdirSync(path.join(project, ".vscode"), { recursive: true });
   fs.writeFileSync(
     path.join(project, ".vscode", "settings.json"),

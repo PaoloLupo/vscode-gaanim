@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { config } from "./config";
 import { Caps, NO_CAPS, parseCaps } from "./core/caps";
+import { launch } from "./core/spawn";
 
 export const log = vscode.window.createOutputChannel("Gaanim");
 
@@ -139,12 +140,13 @@ export function run(args: string[], options: RunOptions = {}): Job | undefined {
   };
   let child: ChildProcess;
   try {
-    child = spawn(program, args, {
+    const start = launch(program, args);
+    child = spawn(start.command, start.args, {
       cwd: options.cwd,
       env: { ...process.env, NO_COLOR: "1", ...options.env },
       stdio: [options.stdin ? "pipe" : "ignore", "pipe", "pipe"],
       windowsHide: true,
-      shell: process.platform === "win32" && /\.(cmd|bat)$/i.test(program),
+      shell: start.shell,
     });
   } catch (error) {
     void vscode.window.showErrorMessage(`Could not start gaanim: ${String(error)}`);
@@ -238,10 +240,11 @@ export function output(program: string, args: string[], timeout = 10_000): Promi
     let text = "";
     let child: ChildProcess;
     try {
-      child = spawn(program, args, {
+      const start = launch(program, args);
+      child = spawn(start.command, start.args, {
         env: { ...process.env, NO_COLOR: "1" },
         windowsHide: true,
-        shell: process.platform === "win32" && /\.(cmd|bat)$/i.test(program),
+        shell: start.shell,
       });
     } catch {
       resolve(undefined);
