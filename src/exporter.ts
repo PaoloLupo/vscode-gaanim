@@ -40,20 +40,24 @@ async function opened(output: string): Promise<void> {
     }
     return;
   }
-  const choice = await vscode.window.showInformationMessage(
-    `Exported ${path.basename(output)}`,
-    "Open",
-    process.platform === "darwin" ? "Reveal in Finder" : "Reveal in File Explorer",
-  );
-  if (choice === "Open") {
-    if (still) {
-      await vscode.commands.executeCommand("vscode.open", uri, { viewColumn: vscode.ViewColumn.Beside });
-    } else {
-      await vscode.env.openExternal(uri);
-    }
-  } else if (choice) {
-    await vscode.commands.executeCommand("revealFileInOS", uri);
-  }
+  // Only offered: the export is done, so the command must not wait for an answer.
+  void vscode.window
+    .showInformationMessage(
+      `Exported ${path.basename(output)}`,
+      "Open",
+      process.platform === "darwin" ? "Reveal in Finder" : "Reveal in File Explorer",
+    )
+    .then((choice) => {
+      if (choice === "Open") {
+        if (still) {
+          void vscode.commands.executeCommand("vscode.open", uri, { viewColumn: vscode.ViewColumn.Beside });
+        } else {
+          void vscode.env.openExternal(uri);
+        }
+      } else if (choice) {
+        void vscode.commands.executeCommand("revealFileInOS", uri);
+      }
+    });
 }
 
 /** Runs `gaanim <args>` with a cancellable progress notification; resolves to the exit code. */
@@ -122,13 +126,11 @@ export async function run(project: Project, output: string, args: string[], pres
     if (report.problems.length > 0) {
       check.publish(project, report);
     }
-    const choice = await vscode.window.showErrorMessage(
-      `✗ ${report.summary || "The export failed."}`,
-      "Show Log",
-    );
-    if (choice) {
-      cli.log.show(true);
-    }
+    void vscode.window.showErrorMessage(`✗ ${report.summary || "The export failed."}`, "Show Log").then((choice) => {
+      if (choice) {
+        cli.log.show(true);
+      }
+    });
     return;
   }
   if (preset?.packWeb) {

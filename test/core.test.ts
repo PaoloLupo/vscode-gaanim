@@ -14,6 +14,7 @@ import { evalNumber, parseSymbols, receiver, slideAt, STRUCTURE } from "../src/c
 import { entries, findTimeline, hoverLines, lineLabels, location, pathKey, playsAt, pointAt, segmentAt, Timeline } from "../src/core/timeline";
 import { findPhrase, normalizeWord, TakeTiming, textWords, voiceoverBlocks } from "../src/core/takes";
 import { glyph, mathItems, scan } from "../src/core/typst";
+import { cmdQuote, launch } from "../src/core/spawn";
 import { readTopLevel } from "../src/core/toml";
 
 const FIXTURES = path.join(__dirname, "..", "..", "test", "fixtures");
@@ -495,5 +496,30 @@ describe("caps and toml", () => {
   it("reads gaanim.toml's top-level keys", () => {
     const raw = readTopLevel(fs.readFileSync(path.join(ROOT, "gaanim.toml"), "utf8"));
     assert.deepEqual(raw, { name: "talk", kind: "slides", entry: "main.py", assets_dir: "assets", output_dir: "exports", language: "en-US" });
+  });
+});
+
+describe("spawn", () => {
+  it("quotes arguments for cmd.exe only when they need it", () => {
+    assert.equal(cmdQuote("inspect"), "inspect");
+    assert.equal(cmdQuote("C:/Users/Ana María/charla"), '"C:/Users/Ana María/charla"');
+    assert.equal(cmdQuote(""), '""');
+    assert.equal(cmdQuote('say "hi"'), '"say \\"hi\\""');
+    assert.equal(cmdQuote("C:\a b\\"), '"C:\a b\\\\"');
+    assert.equal(cmdQuote("a&b"), '"a&b"');
+  });
+
+  it("starts batch files through the shell, quoted, and the rest directly", () => {
+    assert.deepEqual(launch("C:\Program Files\gaanim\gaanim.cmd", ["inspect", "C:\mis charlas\main.py"], "win32"), {
+      command: '"C:\Program Files\gaanim\gaanim.cmd"',
+      args: ["inspect", '"C:\mis charlas\main.py"'],
+      shell: true,
+    });
+    assert.deepEqual(launch("C:\Tools\gaanim.exe", ["inspect", "a b"], "win32"), {
+      command: "C:\Tools\gaanim.exe",
+      args: ["inspect", "a b"],
+      shell: false,
+    });
+    assert.deepEqual(launch("/usr/bin/gaanim.cmd", ["a b"], "linux"), { command: "/usr/bin/gaanim.cmd", args: ["a b"], shell: false });
   });
 });

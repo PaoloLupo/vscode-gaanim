@@ -56,8 +56,13 @@ También vale `npm run package` e instalar el `.vsix` resultante
 
 ## 3. Qué falta comprobar (por orden)
 
-1. **La suite de integración** (`test/integration/suite.ts`) nunca ha pasado
-   de principio a fin. Con VS Code instalado normalmente basta con:
+1. **La suite de integración** (`test/integration/suite.ts`) ya pasa entera
+   en Windows 11 (VS Code 1.142, Node 24): 13/13 con el `gaanim` falso y
+   13/13 con Gaanim 0.13.0 real, en carpetas con espacios. Para llegar ahí se
+   corrigió que en Windows el `gaanim` falso va envuelto en un `.cmd`, que
+   los `.cmd` se lanzan con el programa y los argumentos entre comillas
+   (`src/core/spawn.ts`) y que el aviso *Exported …* ya no bloquea el
+   comando. Falta pasarla en Linux y macOS. Se ejecuta con:
 
    ```bash
    npm run test:integration        # descarga VS Code y usa el gaanim falso
@@ -70,12 +75,7 @@ También vale `npm run package` e instalar el `.vsix` resultante
    GAANIM_TEST_BIN=$(which gaanim) GAANIM_TEST_PROJECT=/tmp/charla npm run test:integration
    ```
 
-   En el contenedor no se podía descargar VS Code, así que se probó dentro de
-   code-server (`test/integration/code-server/run.sh`): la extensión cargó y
-   la suite arrancó, pero se paró en el primer paso porque el `gaanim` falso
-   (`test/integration/fake-gaanim.js`) leía su fixture de una ruta
-   equivocada. Ya está corregido, pero **no se volvió a ejecutar**. Si falla
-   algo más, el log de la extensión está en *Output → Gaanim*.
+   Si falla algo, el log de la extensión está en *Output → Gaanim*.
 
 2. **Prueba a mano en VS Code de escritorio**, que es lo que nunca se vio:
    - la barra lateral *Gaanim* (árbol *Timeline* y *Projects*) y el panel
@@ -101,8 +101,10 @@ También vale `npm run package` e instalar el `.vsix` resultante
 
 4. **Windows**: `previewPath` en `src/preview.ts` manda a la vista previa la
    ruta tal como la escribe la línea de tiempo (mayúscula en la unidad,
-   barras), porque `follow` compara rutas exactas. Sin probar en Windows.
-   Tampoco se probó `gaanim.path` apuntando a un `.cmd`.
+   barras), porque `follow` compara rutas exactas. La suite real en Windows
+   (*preview at cursor* con `follow`) pasa, y `gaanim.path` apuntando a un
+   `.cmd` en una ruta con espacios también; queda verlo a mano con varios
+   archivos de escena.
 
 5. **Atajos**: todos van bajo `Ctrl+Alt+G` y el nudge es
    `Ctrl+Alt+A` / `Ctrl+Alt+X`. Revisar que no choquen con los tuyos.
