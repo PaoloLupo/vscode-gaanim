@@ -117,11 +117,17 @@ También vale `npm run package` e instalar el `.vsix` resultante
   falso (con `xvfb-run` en Linux) y `npm run package`, y sube el `.vsix`
   desde Linux. La suite con el Gaanim real no está en CI: su vista previa
   necesita GPU (o lavapipe) y el binario de Gaanim.
-- **Publicar** en el Marketplace y en Open VSX con el publisher `paololupo`
-  (crear el publisher y un token; `npx vsce publish`, `npx ovsx publish`).
-- **Icono**: `images/icon.png` es una copia de
-  `docs/assets/brand/gaanim-icon-512.png` del repo de Gaanim; si cambia la
-  marca, copiarlo de nuevo.
+- **Publicar**: `.github/workflows/release.yml` publica al empujar una
+  etiqueta `vX.Y.Z` igual a la versión de `package.json`: empaqueta, crea la
+  release de GitHub con el `.vsix` y lo sube al Marketplace (secreto
+  `VSCE_PAT`) y a Open VSX (secreto `OVSX_PAT`); la tienda sin secreto se
+  salta. Falta crear el publisher `paololupo` en ambas tiendas y los dos
+  tokens.
+- **Marca**: `images/icon.png`, `images/activity.svg` e `images/banner.png`
+  salen de `scripts/gen_brand.py`, que importa `tools/generate_brand.py` del
+  repo de Gaanim; si cambia la marca, ejecutarlo de nuevo. Los colores del
+  cabezal (`gaanim.playhead*`, `gaanim.animatingBackground`) y del panel
+  *Preview Timeline* usan la paleta de `docs/assets/brand/README.md`.
 - **Idioma**: la interfaz está en inglés, como el editor de Gaanim y
   gaanim.nvim. Si se quiere en español, VS Code usa `package.nls.*.json` y
   `vscode.l10n`.

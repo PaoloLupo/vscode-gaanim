@@ -6,6 +6,10 @@
   "publisher": "paololupo",
   "license": "MIT OR Apache-2.0",
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1A1A1A",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/PaoloLupo/vscode-gaanim"
@@ -630,27 +634,27 @@
         "id": "gaanim.playheadBackground",
         "description": "Background of the line the preview rests at.",
         "defaults": {
-          "dark": "#3794ff26",
-          "light": "#0066bf1f",
-          "highContrast": "#3794ff40"
+          "dark": "#7C6CFF26",
+          "light": "#5B4AF01F",
+          "highContrast": "#7C6CFF40"
         }
       },
       {
         "id": "gaanim.playheadForeground",
         "description": "Text after the line the preview rests at.",
         "defaults": {
-          "dark": "#3794ff",
-          "light": "#0066bf",
-          "highContrast": "#3794ff"
+          "dark": "#A99FFF",
+          "light": "#5B4AF0",
+          "highContrast": "#A99FFF"
         }
       },
       {
         "id": "gaanim.animatingBackground",
         "description": "Background of the lines whose play animates while the preview plays.",
         "defaults": {
-          "dark": "#89d18526",
-          "light": "#38803626",
-          "highContrast": "#89d18540"
+          "dark": "#FFC9331F",
+          "light": "#F0A80026",
+          "highContrast": "#FFC93340"
         }
       },
       {
@@ -978,6 +982,7 @@
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.6.0",
     "esbuild": "0.25.8",
+    "ovsx": "1.2.0",
     "typescript": "5.8.3"
   }
 }
