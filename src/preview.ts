@@ -15,7 +15,17 @@ import { pathKey, pointAt, segmentAt, Timeline } from "./core/timeline";
 import { editorCommand } from "./editorLink";
 import { previewChanged } from "./events";
 import * as inspect from "./inspect";
-import { currentProject, documentSymbols, Project, projectForDocument, projectSymbols, rememberProject, requireProject, slideAtCursor } from "./project";
+import {
+  commandProject,
+  currentProject,
+  documentSymbols,
+  Project,
+  projectForDocument,
+  projectSymbols,
+  rememberProject,
+  requireProject,
+  slideAtCursor,
+} from "./project";
 
 export interface LaunchOptions {
   present?: boolean;
@@ -387,11 +397,8 @@ function slideName(editor: vscode.TextEditor | undefined): string | undefined {
 
 /** Moves the preview to the instant of the line under the cursor, starting it when it is closed. */
 export async function here(present = false, editor = vscode.window.activeTextEditor): Promise<void> {
-  const project = editor ? projectForDocument(editor.document) : requireProject();
+  const project = editor ? commandProject(editor.document, "This file is not part of a Gaanim project.") : requireProject();
   if (!project) {
-    if (editor) {
-      void vscode.window.showWarningMessage("This file is not part of a Gaanim project.");
-    }
     return;
   }
   if (!editor || editor.document.languageId !== "python") {
@@ -415,8 +422,8 @@ export async function here(present = false, editor = vscode.window.activeTextEdi
 /** Previews only the slide under the cursor. */
 export async function only(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
-  const project = editor && projectForDocument(editor.document);
-  const slide = slideName(editor);
+  const project = editor && commandProject(editor.document);
+  const slide = project && slideName(editor);
   if (project && slide) {
     await launch({ sections: [slide] }, project);
   }
@@ -599,7 +606,7 @@ export function stop(): void {
 /** Presents with choices: from the start or the cursor, how long, on which monitor. */
 export async function presentPick(): Promise<void> {
   const editor = vscode.window.activeTextEditor;
-  const project = (editor && projectForDocument(editor.document)) ?? requireProject();
+  const project = editor ? (projectForDocument(editor.document) ?? requireProject()) : requireProject();
   if (!project) {
     return;
   }

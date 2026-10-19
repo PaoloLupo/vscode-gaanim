@@ -108,6 +108,9 @@ export const config = {
     quiet: () => get("live.quiet", true),
   },
   pythonEnvironment: () => get<"ask" | "always" | "never">("python.useProjectEnvironment", "ask"),
+  workspace: {
+    output: () => get("workspace.output", "exports/{member}") || "exports/{member}",
+  },
 };
 
 /** Where presets are listed: the built-in order, then the rest by name. */

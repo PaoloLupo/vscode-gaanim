@@ -7,12 +7,14 @@ Code. The extension drives the `gaanim` command: it creates projects, keeps
 the live preview on the line you are editing, puts problems on their lines,
 exports, presents, and keeps the narration script beside the code. It brings
 everything [gaanim.nvim](https://github.com/PaoloLupo/gaanim.nvim) does to VS
-Code, and uses Gaanim 0.13's editor channel (`--listen`), JSON messages and
-`gaanim inspect`.
+Code, and uses Gaanim's editor channel (`--listen`), JSON messages,
+`gaanim inspect` and, for workspaces, `gaanim project`.
 
 | Command | What it does |
 |---|---|
 | **Gaanim: New Project…** | `gaanim init` a slides or video project and open it |
+| **Gaanim: New Workspace…** | `gaanim init workspace`: several projects that share code, assets and Python |
+| **Gaanim: Check All Members** | one `gaanim check` of the workspace, each member's problems on its lines |
 | **Gaanim: Preview at Cursor** | the preview rests at the instant of the cursor's line, without a restart |
 | **Gaanim: Toggle Preview Follows Cursor** | the preview follows the cursor through the code |
 | **Gaanim: Toggle Live Mode** | saves as you type, so every change reaches the preview |
@@ -74,6 +76,53 @@ Code, and uses Gaanim 0.13's editor channel (`--listen`), JSON messages and
 - **Check Setup** reports `gaanim` and what it supports, FFmpeg, uv, the
   Python extension, the project's `.venv`, docs and script.
 
+### Workspaces
+
+A [workspace](https://paololupo.github.io/gaanim/guias/proyectos/#workspaces)
+is several projects in one repository that share Python code, assets and one
+`.venv`: a `gaanim.toml` with a `[workspace]` table at the root says where
+its members are and what they share. The extension asks
+`gaanim project <file> --json` in the background what each file belongs to,
+without running Python, and keeps the answer until a `gaanim.toml` is
+written. It needs a Gaanim with `gaanim project`; without it everything works
+per project, as before.
+
+- **Members and shared modules.** A member's file belongs to that member. The
+  workspace's own files, the shared modules above all, run as the *active
+  member*: the one whose files you opened last (or the only one). Preview,
+  check, live, the status bar and the times in the code come from it; the
+  status bar shows which member it is, and a click picks another. With no
+  member opened yet, a command asks which one and runs again. A script that
+  imports gaanim outside the shared folders stays a project of its own.
+  Saving a shared module marks every member's timeline stale.
+- **Python.** The interpreter is the workspace's `.venv` (or a member's own),
+  with the same consent as a project's (`gaanim.python.useProjectEnvironment`).
+  The folders of the member's `sys.path` that Pylance does not search on its
+  own (it already searches the window's root and its `src`) are added to
+  `python.analysis.extraPaths` in the folder's settings, after yours, so the
+  shared code completes. `python.analysis.extraPaths` is one list for the
+  whole folder, so it grows with the members you open.
+- **Check All Members** runs one `gaanim check` of the workspace: each member
+  gets its own problems, an invalid manifest its error, and a summary says
+  `2 of 3 members passed · failed: videos/outro`.
+- **Export All Members…** exports each member with a preset to
+  `gaanim.workspace.output` (`exports/{member}`, so `exports/videos/intro.mp4`);
+  a member's own *Export…* goes to its `output_dir` as usual.
+- **Projects view.** A workspace is one entry with its members grouped by
+  `group`, invalid ones in red with their error and the last check's result,
+  with *New Video*, *New Presentation*, *Check All Members* and *Export All
+  Members…*; on a member, *Check*, *Export…* and *Run Shared Files as This
+  Member*. The workspace open in the window heads the list even without
+  `gaanim.projectsDir`.
+- **New.** *New Workspace…* runs `gaanim init workspace`. Inside a workspace,
+  *New Project…*, *New Video* and *New Presentation* create a member beside
+  the others of its kind (`gaanim init video videos/ep2`) and show Gaanim's
+  warning when `members` leaves it out.
+- **Assets.** Names resolve, complete (marked *shared*) and are checked in the
+  workspace's shared asset folders too, after the member's own.
+- **Check Setup** shows the workspace, its members, the active one, the
+  interpreter and the folders of `sys.path`.
+
 ### Beyond gaanim.nvim
 
 - **Gaanim side bar**: the project's real timeline as a tree (times,
@@ -98,8 +147,9 @@ Code, and uses Gaanim 0.13's editor channel (`--listen`), JSON messages and
 ## Requirements
 
 - VS Code 1.90 or newer (or Cursor, VSCodium).
-- `gaanim` on `PATH`, or `gaanim.path` set. Gaanim 0.13 has everything; older
-  versions work with less (see below).
+- `gaanim` on `PATH`, or `gaanim.path` set. Gaanim 0.15 has everything
+  (workspaces need its `gaanim project`); older versions work with less (see
+  below).
 - The Python extension (with Pylance or basedpyright) for completion of the
   Gaanim API.
 
@@ -142,7 +192,8 @@ All under `Ctrl+Alt+G` (`Cmd+Alt+G` on macOS), in a Gaanim project:
 | `gaanim.script.wpm` | `150` | words per minute for spoken time |
 | `gaanim.outline.patterns` | | teach the outline a project's own way of naming slides |
 | `gaanim.live.delay` | `700` | ms after the last change before live mode saves |
-| `gaanim.python.useProjectEnvironment` | `ask` | point the Python extension at the `.venv` |
+| `gaanim.python.useProjectEnvironment` | `ask` | point the Python extension at the `.venv`, and Pylance at a workspace's shared code |
+| `gaanim.workspace.output` | `exports/{member}` | where *Export All Members* writes, relative to the workspace |
 
 `gaanim.outline.patterns` covers decks with one module per slide, such as
 `NAME = "Cover"` in each:
@@ -162,8 +213,13 @@ npm test               # unit tests of the parsers, without VS Code
 npm run package        # gaanim-<version>.vsix
 ```
 
-`npm run test:integration` runs `test/integration/suite.ts` inside VS Code
-against a stand-in `gaanim`; with `GAANIM_TEST_BIN` (a real `gaanim`) and
-`GAANIM_TEST_PROJECT` (a project from `gaanim init`) it drives the real one,
-whose preview needs a display and a GPU (Xvfb and Mesa's lavapipe work).
+`npm run test:integration` runs `test/integration/suite.ts` (a project) and
+`test/integration/workspace.ts` (a copy of `test/fixtures/channel`) inside VS
+Code against a stand-in `gaanim`; with `GAANIM_TEST_BIN` (a real `gaanim`)
+and `GAANIM_TEST_PROJECT` (a project from `gaanim init`) it drives the real
+one, whose preview needs a display and a GPU (Xvfb and Mesa's lavapipe work).
+`GAANIM_TEST_WORKSPACE`, a copy of `test/fixtures/channel` with a `.venv`,
+adds the workspace suite to a real run; `GAANIM_TEST_ONLY=project` or
+`workspace` runs one suite. `test/fixtures/channel.project.json` and
+`channel.check.jsonl` are what Gaanim printed for the fixture.
 `scripts/gen_typst_symbols.py` regenerates the Typst symbol table from codex.

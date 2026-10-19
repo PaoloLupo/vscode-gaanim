@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { config } from "./config";
 import { parseSymbols, SceneSymbol, slideAt, SlideAt, SLIDE_KINDS } from "./core/symbols";
 import { readTopLevel, TomlValue } from "./core/toml";
+import * as workspace from "./workspace";
 
 export interface Project {
   /** Project folder, or the script's folder for a lone script. */
@@ -27,9 +28,15 @@ function exists(file: string): boolean {
   return fs.existsSync(file);
 }
 
-/** The project of a folder holding gaanim.toml. */
+/**
+ * The project of a folder holding gaanim.toml; undefined for a manifest that
+ * names no project (a workspace's own, or one that only sets `assets_dir`).
+ */
 export function loadProject(root: string): Project | undefined {
   const manifest = path.join(root, "gaanim.toml");
+  if (workspace.manifest(root)?.project === false) {
+    return undefined;
+  }
   let text: string;
   try {
     text = fs.readFileSync(manifest, "utf8");
@@ -52,11 +59,15 @@ export function loadProject(root: string): Project | undefined {
   };
 }
 
-/** The folder holding gaanim.toml at or above `start`. */
+/**
+ * The folder at or above `start` whose gaanim.toml names a project or a
+ * workspace; a manifest that does neither is skipped, as Gaanim does.
+ */
 export function findRoot(start: string): string | undefined {
   let dir = start;
   for (;;) {
-    if (exists(path.join(dir, "gaanim.toml"))) {
+    const info = workspace.manifest(dir);
+    if (info && (info.project || info.workspace)) {
       return dir;
     }
     const parent = path.dirname(dir);
@@ -78,9 +89,43 @@ export function forgetRoots(): void {
   rootCache.clear();
 }
 
+function isGaanimScript(file: string, text?: string): boolean {
+  if (!file.endsWith(".py")) {
+    return false;
+  }
+  let source = text;
+  if (source === undefined) {
+    try {
+      source = fs.readFileSync(file, "utf8");
+    } catch {
+      return false;
+    }
+  }
+  return importsGaanim(source);
+}
+
+/** The project a workspace's own files run as: its active member (or its only one). */
+export function memberProject(root: string): Project | undefined {
+  const member = workspace.activeMember(root);
+  return member ? loadProject(member) : undefined;
+}
+
+/**
+ * What a file in a workspace's own folders acts as: a script that imports
+ * gaanim outside the shared Python folders is a project of its own (a
+ * sketch); anything else, a shared module above all, runs as the active member.
+ */
+function inWorkspace(root: string, file: string, text?: string): Project | undefined {
+  if (!workspace.isSharedFile(root, file) && isGaanimScript(file, text)) {
+    return scriptProject(file);
+  }
+  return memberProject(root);
+}
+
 /**
  * The project of a file: the gaanim.toml above it, or the file itself when
- * it is a Python script that imports gaanim outside any project.
+ * it is a Python script that imports gaanim outside any project. In a
+ * workspace's own folders, see `inWorkspace`.
  */
 export function projectForFile(file: string, text?: string): Project | undefined {
   const dir = path.dirname(file);
@@ -90,22 +135,20 @@ export function projectForFile(file: string, text?: string): Project | undefined
     rootCache.set(dir, root);
   }
   if (root) {
-    return loadProject(root);
-  }
-  if (!file.endsWith(".py")) {
-    return undefined;
-  }
-  let source = text;
-  if (source === undefined) {
-    try {
-      source = fs.readFileSync(file, "utf8");
-    } catch {
-      return undefined;
+    const project = loadProject(root);
+    if (project) {
+      return project;
+    }
+    if (workspace.isRoot(root)) {
+      return inWorkspace(root, file, text);
     }
   }
-  if (!importsGaanim(source)) {
-    return undefined;
-  }
+  return isGaanimScript(file, text) ? scriptProject(file) : undefined;
+}
+
+/** A Python file that imports gaanim, as a project of its own. */
+function scriptProject(file: string): Project {
+  const dir = path.dirname(file);
   return {
     root: dir,
     target: file,
@@ -132,13 +175,51 @@ export function currentProject(): Project | undefined {
   if (fromEditor) {
     return fromEditor;
   }
+  if (editorWorkspace()) {
+    // A workspace's own file with no member to run as yet.
+    return undefined;
+  }
   for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    const project = loadProject(folder.uri.fsPath);
+    const root = folder.uri.fsPath;
+    const project = loadProject(root) ?? (workspace.isRoot(root) ? memberProject(root) : undefined);
     if (project) {
       return project;
     }
   }
   return lastProject && exists(lastProject.root) ? lastProject : undefined;
+}
+
+/** The workspace whose own folders (a shared module, its manifest) hold a document. */
+function ownWorkspace(document: vscode.TextDocument | undefined): string | undefined {
+  if (document?.uri.scheme !== "file") {
+    return undefined;
+  }
+  const root = findRoot(path.dirname(document.uri.fsPath));
+  return root && workspace.isRoot(root) ? root : undefined;
+}
+
+/** The workspace whose own folders hold the active editor's file. */
+function editorWorkspace(): string | undefined {
+  return ownWorkspace(vscode.window.activeTextEditor?.document);
+}
+
+/**
+ * The project of a document, for a command run on it. In a workspace's own
+ * file with no member to run as yet, it asks which one (and the command runs
+ * again); otherwise it tells `warning` when there is none.
+ */
+export function commandProject(document: vscode.TextDocument, warning?: string): Project | undefined {
+  const project = projectForDocument(document);
+  if (project) {
+    return project;
+  }
+  const root = ownWorkspace(document);
+  if (root) {
+    void workspace.choose(root);
+  } else if (warning) {
+    void vscode.window.showWarningMessage(warning);
+  }
+  return undefined;
 }
 
 let lastProject: Project | undefined;
@@ -150,13 +231,24 @@ export function rememberProject(project: Project | undefined): void {
   }
 }
 
-/** Like `currentProject`, but tells the person when there is none. */
+/**
+ * Like `currentProject`, but tells the person when there is none. In a
+ * workspace's own file with no active member yet, it takes the only member
+ * or asks which one, and runs the command again with it.
+ */
 export function requireProject(): Project | undefined {
   const project = currentProject();
-  if (!project) {
-    void vscode.window.showWarningMessage("No Gaanim project here (no gaanim.toml above this file, and it does not import gaanim).");
+  if (project) {
+    return project;
   }
-  return project;
+  const root =
+    editorWorkspace() ?? (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath).find((folder) => workspace.isRoot(folder));
+  if (root) {
+    void workspace.choose(root);
+    return undefined;
+  }
+  void vscode.window.showWarningMessage("No Gaanim project here (no gaanim.toml above this file, and it does not import gaanim).");
+  return undefined;
 }
 
 /** Python files of a project, the entry script first, skipping environments and outputs. */
@@ -254,15 +346,38 @@ export function slideAtCursor(editor: vscode.TextEditor): SlideAt {
   return slideAt(documentSymbols(editor.document), editor.selection.active.line + 1);
 }
 
-/** Projects under `gaanim.projectsDir`, up to three levels deep, newest first. */
-export function listProjects(): (Project & { mtime: number })[] {
+/** A workspace among the listed projects: it stands for its members. */
+export interface WorkspaceListing {
+  kind: "workspace";
+  root: string;
+  manifest: string;
+  name: string;
+  mtime: number;
+}
+
+export type Listed = (Project & { mtime: number }) | WorkspaceListing;
+
+/** Projects and workspaces under `gaanim.projectsDir`, up to three levels deep, newest first. */
+export function listProjects(): Listed[] {
   const dir = config.projectsDir();
   if (!dir) {
     return [];
   }
   const ignore = config.outline.ignore();
-  const found: (Project & { mtime: number })[] = [];
+  const found: Listed[] = [];
   const walk = (folder: string, depth: number) => {
+    if (workspace.isRoot(folder)) {
+      // Its members are reached through it.
+      const manifest = path.join(folder, "gaanim.toml");
+      let mtime = 0;
+      try {
+        mtime = fs.statSync(manifest).mtimeMs;
+      } catch {
+        // Keep it, last.
+      }
+      found.push({ kind: "workspace", root: folder, manifest, name: workspace.manifest(folder)?.name ?? path.basename(folder), mtime });
+      return;
+    }
     const project = loadProject(folder);
     if (project) {
       let mtime = 0;
@@ -293,11 +408,20 @@ export function listProjects(): (Project & { mtime: number })[] {
   return found.sort((a, b) => b.mtime - a.mtime);
 }
 
-/** The project's Python interpreter in its `.venv`, if there is one. */
+/** The Python interpreter in the `.venv` of a folder, if there is one. */
 export function interpreter(root: string): string | undefined {
   const candidates =
     process.platform === "win32"
       ? [".venv/Scripts/python.exe", "venv/Scripts/python.exe"]
       : [".venv/bin/python", "venv/bin/python"];
   return candidates.map((relative) => path.join(root, relative)).find(exists);
+}
+
+/** Without `gaanim project`: the project's own `.venv`, else its workspace's above it. */
+export function fallbackInterpreter(project: Project): string | undefined {
+  if (project.kind === "script") {
+    return interpreter(project.root);
+  }
+  const above = workspace.rootAbove(path.dirname(project.root));
+  return interpreter(project.root) ?? (above ? interpreter(above) : undefined);
 }

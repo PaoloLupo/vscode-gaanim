@@ -1,0 +1,7 @@
+{"type":"message","level":"success","label":"init","message":"Created slides project: talks\\retro","file":null,"line":null,"column":null}
+{"type":"detail","key":"Edit","value":"talks\\retro\\main.py"}
+{"type":"detail","key":"Preview","value":"gaanim talks\\retro"}
+{"type":"detail","key":"Check","value":"gaanim check talks\\retro"}
+{"type":"detail","key":"Present","value":"gaanim --present --monitor 1 talks\\retro"}
+{"type":"detail","key":"Python","value":".venv"}
+{"type":"init","kind":"slides","root":"{root}/talks/retro","entry":"{root}/talks/retro/main.py","workspace":"{root}","member":true,"venv":"{root}/.venv"}

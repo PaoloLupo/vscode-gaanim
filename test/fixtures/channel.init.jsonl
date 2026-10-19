@@ -1,0 +1,9 @@
+{"type":"message","level":"warning","label":"init","message":"extras\\teaser is inside workspace channel, whose members do not include it","file":null,"line":null,"column":null}
+{"type":"hint","message":"Add it in gaanim.toml: members = [..., \"extras/teaser\"]"}
+{"type":"message","level":"success","label":"init","message":"Created video project: extras\\teaser","file":null,"line":null,"column":null}
+{"type":"detail","key":"Edit","value":"extras\\teaser\\main.py"}
+{"type":"detail","key":"Preview","value":"gaanim extras\\teaser"}
+{"type":"detail","key":"Check","value":"gaanim check extras\\teaser"}
+{"type":"detail","key":"Export","value":"gaanim export extras\\teaser --output exports/video.mp4 --quality production"}
+{"type":"message","level":"warning","label":"python","message":"authoring environment not ready: the project is not a member of its workspace yet","file":null,"line":null,"column":null}
+{"type":"init","kind":"video","root":"{root}/extras/teaser","entry":"{root}/extras/teaser/main.py","workspace":"{root}","member":false,"venv":null}

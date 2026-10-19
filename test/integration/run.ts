@@ -25,42 +25,69 @@ function fakeGaanim(extension: string, work: string): string {
   return wrapper;
 }
 
-async function main(): Promise<void> {
-  const extension = path.resolve(__dirname, "..", "..", "..");
-  // The space checks that paths with spaces reach gaanim whole.
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), "gaanim vscode-"));
-  const real = process.env.GAANIM_TEST_BIN;
-  const source = real ? process.env.GAANIM_TEST_PROJECT : path.join(extension, "test", "fixtures", "talk");
-  if (!source) {
-    throw new Error("GAANIM_TEST_BIN needs GAANIM_TEST_PROJECT, a project made with gaanim init");
-  }
-  const project = path.join(work, "talk");
-  fs.cpSync(source, project, { recursive: true, verbatimSymlinks: true });
-  const bin = real ?? fakeGaanim(extension, work);
-  fs.mkdirSync(path.join(project, ".vscode"), { recursive: true });
+/** Copies a project or workspace into `work` with settings that keep the suite from waiting on prompts. */
+function prepare(source: string, folder: string, bin: string, extra: Record<string, unknown> = {}): void {
+  fs.cpSync(source, folder, { recursive: true, verbatimSymlinks: true });
+  fs.mkdirSync(path.join(folder, ".vscode"), { recursive: true });
   fs.writeFileSync(
-    path.join(project, ".vscode", "settings.json"),
+    path.join(folder, ".vscode", "settings.json"),
     JSON.stringify(
       {
         "gaanim.path": bin,
         "gaanim.export.open": "never",
         "gaanim.python.useProjectEnvironment": "never",
         "gaanim.check.onSave": false,
+        ...extra,
       },
       null,
       2,
     ),
   );
-  await runTests({
-    version: process.env.VSCODE_TEST_VERSION ?? "stable",
-    extensionDevelopmentPath: extension,
-    extensionTestsPath: path.join(__dirname, "suite.js"),
-    launchArgs: [project, "--disable-extensions", "--disable-workspace-trust", "--user-data-dir", path.join(work, "user")],
-    extensionTestsEnv: {
-      GAANIM_TEST_REAL: real ? "1" : "",
-      FAKE_GAANIM_LOG: path.join(work, "fake.log"),
-    },
-  });
+}
+
+async function main(): Promise<void> {
+  const extension = path.resolve(__dirname, "..", "..", "..");
+  // The space checks that paths with spaces reach gaanim whole.
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "gaanim vscode-"));
+  const real = process.env.GAANIM_TEST_BIN;
+  const source = real ? process.env.GAANIM_TEST_PROJECT : path.join(extension, "test", "fixtures", "talk");
+  // With the real gaanim, a copy of test/fixtures/channel with a .venv (the workspace suite runs only with it).
+  const workspaceSource = real ? process.env.GAANIM_TEST_WORKSPACE : path.join(extension, "test", "fixtures", "channel");
+  if (!source) {
+    throw new Error("GAANIM_TEST_BIN needs GAANIM_TEST_PROJECT, a project made with gaanim init");
+  }
+  const bin = real ?? fakeGaanim(extension, work);
+  const suites: { name: string; folder: string; tests: string }[] = [];
+  if (!process.env.GAANIM_TEST_ONLY || process.env.GAANIM_TEST_ONLY === "project") {
+    const project = path.join(work, "talk");
+    prepare(source, project, bin);
+    suites.push({ name: "project", folder: project, tests: "suite.js" });
+  }
+  if (workspaceSource && (!process.env.GAANIM_TEST_ONLY || process.env.GAANIM_TEST_ONLY === "workspace")) {
+    const channel = path.join(work, "channel");
+    // A still every member can export, without asking for a frame.
+    prepare(workspaceSource, channel, bin, { "gaanim.export.presets": { frame: { ext: "png", args: ["--frame", "0.5"], desc: "A still at 0.5 s" } } });
+    if (!real) {
+      // The stand-in's workspace environment: an interpreter that only has to exist.
+      const python = path.join(channel, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+      fs.mkdirSync(path.dirname(python), { recursive: true });
+      fs.writeFileSync(python, "");
+    }
+    suites.push({ name: "workspace", folder: channel, tests: "workspace.js" });
+  }
+  for (const suite of suites) {
+    console.log(`\n${suite.name} suite`);
+    await runTests({
+      version: process.env.VSCODE_TEST_VERSION ?? "stable",
+      extensionDevelopmentPath: extension,
+      extensionTestsPath: path.join(__dirname, suite.tests),
+      launchArgs: [suite.folder, "--disable-extensions", "--disable-workspace-trust", "--user-data-dir", path.join(work, `user-${suite.name}`)],
+      extensionTestsEnv: {
+        GAANIM_TEST_REAL: real ? "1" : "",
+        FAKE_GAANIM_LOG: path.join(work, `fake-${suite.name}.log`),
+      },
+    });
+  }
 }
 
 main().catch((error) => {

@@ -18,6 +18,7 @@ import { readScript, takeFile } from "./narration";
 import { loopedSegment } from "./preview";
 import { documentSymbols, projectForDocument } from "./project";
 import { describe as describeMarker, resolveMarkers } from "./takeInspector";
+import * as workspace from "./workspace";
 
 export const SELECTOR: vscode.DocumentSelector = { language: "python", scheme: "file" };
 
@@ -314,11 +315,20 @@ export class Completion implements vscode.CompletionItemProvider {
       empty.range = range;
       return [empty];
     }
+    const owner = found.some((file) => file.shared) ? workspace.of(project.root) : undefined;
     return found.map((file) => {
-      const completion = new vscode.CompletionItem({ label: file.name, description: formatSize(file.size) }, vscode.CompletionItemKind.File);
+      const completion = new vscode.CompletionItem(
+        { label: file.name, description: file.shared ? `shared · ${formatSize(file.size)}` : formatSize(file.size) },
+        vscode.CompletionItemKind.File,
+      );
       completion.range = range;
       completion.filterText = file.name;
-      completion.documentation = new vscode.MarkdownString(`\`${path.relative(project.root, file.path)}\``);
+      // The project's own files first.
+      completion.sortText = `${file.shared ? "1" : "0"}${file.name}`;
+      const shown = file.shared && owner ? path.relative(owner.root, file.path) : path.relative(project.root, file.path);
+      completion.documentation = new vscode.MarkdownString(
+        `\`${shown}\`${file.shared ? `\n\nShared by the workspace${owner ? ` ${owner.name}` : ""}` : ""}`,
+      );
       return completion;
     });
   }
@@ -337,11 +347,13 @@ export function publishAssets(document: vscode.TextDocument): void {
     return;
   }
   const list: vscode.Diagnostic[] = [];
+  const shared = assets.sharedBases(project);
+  const where = path.relative(project.root, project.assetsDir) || ".";
   for (const ref of assetReferences(document.getText().split(/\r?\n/))) {
     if (!assets.resolve(project, ref.name)) {
       const diagnostic = new vscode.Diagnostic(
         new vscode.Range(ref.line - 1, ref.start, ref.line - 1, ref.end),
-        `${ref.call}: no file named “${ref.name}” in ${path.relative(project.root, project.assetsDir) || "."}`,
+        `${ref.call}: no file named “${ref.name}” in ${where}${shared.length > 0 ? " or the workspace's shared assets" : ""}`,
         vscode.DiagnosticSeverity.Warning,
       );
       diagnostic.source = "gaanim";

@@ -6,16 +6,28 @@ import * as path from "node:path";
 import { which } from "./cli";
 import { config } from "./config";
 import { formatSize, isAbsolute } from "./core/assets";
+import { within } from "./core/workspace";
 import { base } from "./narration";
 import { Project } from "./project";
+import * as workspace from "./workspace";
 
-/** Folders a relative name may resolve in, most likely first. */
+/** The shared asset folders of the project's workspace, where a name not found in its own folders is looked for. */
+export function sharedBases(project: Project): string[] {
+  return workspace.sharedAssets(project.root, project.kind).map((dir) => path.normalize(dir));
+}
+
+/** Folders a relative name may resolve in, most likely first: the project's own, then its workspace's shared ones. */
 export function bases(project: Project): string[] {
   const entryDir = path.dirname(project.entry);
-  const list = [base(project), project.assetsDir, path.join(entryDir, "assets"), entryDir, project.root].map((dir) =>
-    path.normalize(dir),
+  const list = [base(project), project.assetsDir, path.join(entryDir, "assets"), entryDir, project.root, ...sharedBases(project)].map(
+    (dir) => path.normalize(dir),
   );
   return [...new Set(list)];
+}
+
+/** Whether a resolved file comes from the workspace's shared assets rather than the project's own. */
+export function isShared(project: Project, file: string): boolean {
+  return sharedBases(project).some((dir) => within(file, dir)) && !within(file, project.root);
 }
 
 /** The file a name in the scene refers to, or undefined when none exists. */
@@ -33,14 +45,35 @@ export interface AssetFile {
   name: string;
   path: string;
   size: number;
+  /** From the workspace's shared assets. */
+  shared?: boolean;
 }
 
-/** Files under the asset directory with one of `extensions` (any when false). */
+/**
+ * Files under the asset directory with one of `extensions` (any when false),
+ * then those of the workspace's shared asset folders that the project does
+ * not have a file of the same name for.
+ */
 export function files(project: Project, extensions: string[] | false): AssetFile[] {
   let root = project.assetsDir;
   if (!fs.existsSync(root)) {
     root = path.dirname(project.entry);
   }
+  const own = filesUnder(root, extensions);
+  const names = new Set(own.map((file) => file.name));
+  const shared: AssetFile[] = [];
+  for (const dir of sharedBases(project)) {
+    for (const file of filesUnder(dir, extensions)) {
+      if (!names.has(file.name)) {
+        names.add(file.name);
+        shared.push({ ...file, shared: true });
+      }
+    }
+  }
+  return [...own, ...shared];
+}
+
+function filesUnder(root: string, extensions: string[] | false): AssetFile[] {
   const wanted = new Set(extensions || []);
   const ignore = config.outline.ignore();
   const found: AssetFile[] = [];
@@ -83,7 +116,9 @@ export function describe(project: Project, file: string): Promise<string> {
   } catch {
     // No size.
   }
-  const lines = [`\`${path.relative(project.root, file) || file}\`  ${size}`];
+  const owner = isShared(project, file) ? workspace.of(project.root) : undefined;
+  const shown = owner ? path.relative(owner.root, file) : path.relative(project.root, file) || file;
+  const lines = [`\`${shown}\`  ${size}${owner ? `  · shared by ${owner.name}` : ""}`];
   const ffprobe = which("ffprobe");
   if (!ffprobe) {
     return Promise.resolve(lines.join("\n"));

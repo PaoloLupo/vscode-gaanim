@@ -1,18 +1,23 @@
 // The preview's state and the cursor's instant in the status bar.
 
+import * as path from "node:path";
 import * as vscode from "vscode";
 import { clock } from "./core/clock";
 import { pointAt } from "./core/timeline";
 import * as inspect from "./inspect";
 import * as live from "./live";
 import { following, status } from "./preview";
-import { currentProject, projectForDocument } from "./project";
+import { currentProject, findRoot, projectForDocument } from "./project";
+import * as workspace from "./workspace";
 
 const previewItem = vscode.window.createStatusBarItem("gaanim.preview", vscode.StatusBarAlignment.Left, 50);
 previewItem.name = "Gaanim Preview";
 const cursorItem = vscode.window.createStatusBarItem("gaanim.cursor", vscode.StatusBarAlignment.Right, 200);
 cursorItem.name = "Gaanim Instant at Cursor";
 cursorItem.command = "gaanim.previewHere";
+const memberItem = vscode.window.createStatusBarItem("gaanim.member", vscode.StatusBarAlignment.Left, 49);
+memberItem.name = "Gaanim Workspace Member";
+memberItem.command = "gaanim.useMember";
 
 /** Shows the state of the current project's preview. */
 export function refreshPreview(): void {
@@ -78,7 +83,28 @@ export function refreshCursor(editor = vscode.window.activeTextEditor): void {
   cursorItem.show();
 }
 
+/**
+ * In a workspace's own file (a shared module), the member it runs as; a click
+ * picks another one.
+ */
+export function refreshMember(editor = vscode.window.activeTextEditor): void {
+  const file = editor?.document.uri.scheme === "file" ? editor.document.uri.fsPath : undefined;
+  const root = file ? findRoot(path.dirname(file)) : undefined;
+  const project = editor && projectForDocument(editor.document);
+  if (!file || !root || !workspace.isRoot(root) || project?.kind === "script") {
+    memberItem.hide();
+    return;
+  }
+  const name = workspace.at(root)?.name ?? path.basename(root);
+  memberItem.text = project ? `$(file-submodule) ${project.name}` : "$(file-submodule) no member";
+  memberItem.tooltip = project
+    ? `This file belongs to ${name}: preview, check and live run it as ${project.name}. Click to run it as another member.`
+    : `This file belongs to ${name}. Click to pick the member it runs as.`;
+  memberItem.show();
+}
+
 export function dispose(): void {
   previewItem.dispose();
   cursorItem.dispose();
+  memberItem.dispose();
 }

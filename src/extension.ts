@@ -1,5 +1,6 @@
 // Gaanim for VS Code: the commands, providers and views, wired to the editor's events.
 
+import * as path from "node:path";
 import * as vscode from "vscode";
 import * as check from "./check";
 import * as cli from "./cli";
@@ -9,7 +10,7 @@ import * as decorations from "./decorations";
 import * as docs from "./docs";
 import { doctor } from "./doctor";
 import { openAt, UriHandler } from "./editorLink";
-import { disposeEvents, previewChanged, scriptChanged, timelineChanged } from "./events";
+import { disposeEvents, previewChanged, scriptChanged, timelineChanged, workspaceChanged } from "./events";
 import * as exporter from "./exporter";
 import * as inspect from "./inspect";
 import * as live from "./live";
@@ -17,7 +18,7 @@ import * as navigation from "./navigation";
 import { isScript } from "./narration";
 import { nudge } from "./nudge";
 import * as preview from "./preview";
-import { forgetRoots, forgetSymbols, projectForDocument, rememberProject, currentProject } from "./project";
+import { findRoot, forgetRoots, forgetSymbols, loadProject, projectForDocument, projectForFile, rememberProject, currentProject } from "./project";
 import * as projects from "./projects";
 import {
   assetDiagnostics,
@@ -35,7 +36,9 @@ import { Scrubber } from "./scrubber";
 import * as scriptView from "./scriptView";
 import * as statusBar from "./statusBar";
 import * as takes from "./takeInspector";
-import { EntryNode, ProjectsTree, TimelineTree } from "./views";
+import { EntryNode, ProjectsNode, ProjectsTree, TimelineTree } from "./views";
+import type { Workspace } from "./core/workspace";
+import * as workspace from "./workspace";
 
 /** Brings an editor to a line of a document. */
 async function focus(uri: vscode.Uri, line: number): Promise<vscode.TextEditor | undefined> {
@@ -66,10 +69,21 @@ function setContext(key: string, value: unknown): void {
   void vscode.commands.executeCommand("setContext", key, value);
 }
 
+/** The workspace whose own folders (a shared module, its manifest) hold a file. */
+function ownWorkspace(file: string): string | undefined {
+  const root = findRoot(path.dirname(file));
+  return root && workspace.isRoot(root) ? root : undefined;
+}
+
 function updateContext(): void {
   const editor = vscode.window.activeTextEditor;
+  const file = editor?.document.uri.scheme === "file" ? editor.document.uri.fsPath : undefined;
   const project = (editor && projectForDocument(editor.document)) ?? currentProject();
-  setContext("gaanim.inProject", Boolean(project));
+  // A workspace's shared module counts: its commands ask which member to run as.
+  const shared = Boolean(file && editor?.document.languageId === "python" && ownWorkspace(file));
+  setContext("gaanim.inProject", Boolean(project) || shared);
+  const targets = [file, ...(vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath)];
+  setContext("gaanim.inWorkspace", targets.some((target) => target && workspace.rootFor(target)));
   const running = project ? preview.status.get(project.root) : undefined;
   setContext("gaanim.previewRunning", Boolean(running));
   setContext("gaanim.following", Boolean(project && preview.following.has(project.root)));
@@ -81,12 +95,29 @@ export interface GaanimApi {
   previews: typeof preview.status;
   timeline: typeof inspect.cached;
   reports: typeof check.lastReport;
+  workspaceReports: typeof check.lastWorkspaceReport;
+  activeMember: typeof workspace.activeMember;
+  projectFor: typeof projectForFile;
+  environment: typeof python.environment;
+  projects: ProjectsTree;
 }
 
 export function activate(context: vscode.ExtensionContext): GaanimApi {
   const subscriptions = context.subscriptions;
+  workspace.restore(context.workspaceState);
+  // A command that needs a member in a workspace's shared file asks which
+  // one and runs again: it knows how from here.
   const command = (id: string, run: (...args: never[]) => unknown) =>
-    subscriptions.push(vscode.commands.registerCommand(id, run as (...args: unknown[]) => unknown));
+    subscriptions.push(
+      vscode.commands.registerCommand(id, (...args: unknown[]) => {
+        workspace.setRetry(() => vscode.commands.executeCommand(id, ...args));
+        try {
+          return (run as (...args: unknown[]) => unknown)(...args);
+        } finally {
+          workspace.setRetry(undefined);
+        }
+      }),
+    );
 
   subscriptions.push(vscode.window.registerUriHandler(new UriHandler()));
 
@@ -120,7 +151,51 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
   command("gaanim.new", (kind?: string, name?: string) => projects.newProject(context, kind, name));
   command("gaanim.openProject", () => projects.pickProject(context));
   command("gaanim.openProjectAt", (root: string) => projects.openProject(context, root));
-  command("gaanim.refreshProjects", () => projectsTree.refresh());
+  command("gaanim.refreshProjects", () => {
+    forgetRoots();
+    workspace.invalidate();
+    projectsTree.refresh();
+  });
+
+  // Workspaces.
+  const memberRoot = async (node?: ProjectsNode): Promise<Workspace | undefined> =>
+    node && node.type !== "project" ? (node.type === "workspace" ? await workspace.load(node.root) : node.workspace) : await workspace.current();
+  command("gaanim.newWorkspace", (name?: string) => projects.newWorkspace(context, name));
+  command("gaanim.newMember", (kind?: string, root?: string, name?: string) => projects.newMember(context, root, kind, name));
+  command("gaanim.checkWorkspace", async (node?: ProjectsNode) => {
+    const found = await memberRoot(node);
+    if (found) {
+      await check.runWorkspace(found, node?.type === "group" ? node.members.map((member) => member.path) : undefined);
+    }
+  });
+  command("gaanim.exportWorkspace", async (node?: ProjectsNode | string) => {
+    const found = await memberRoot(typeof node === "string" ? undefined : node);
+    if (found) {
+      await exporter.exportWorkspace(found, typeof node === "string" ? node : undefined, typeof node === "object" && node.type === "group" ? node.members : undefined);
+    }
+  });
+  command("gaanim.useMember", async () => {
+    const found = await workspace.current();
+    const member = found && (await workspace.pickMember(found, `Run the shared files of ${found.name} as`, true));
+    if (found && member) {
+      workspace.use(found.root, member.root);
+    }
+  });
+  command("gaanim.workspace.newVideo", (node: ProjectsNode) => node.type === "workspace" && projects.newMember(context, node.root, "video"));
+  command("gaanim.workspace.newSlides", (node: ProjectsNode) => node.type === "workspace" && projects.newMember(context, node.root, "slides"));
+  command("gaanim.member.open", async (node: ProjectsNode) => {
+    if (node.type === "member") {
+      await projects.openMember(context, node.workspace.root, node.member);
+    }
+  });
+  command("gaanim.member.use", (node: ProjectsNode) => node.type === "member" && workspace.use(node.workspace.root, node.member.root));
+  command("gaanim.member.check", (node: ProjectsNode) => node.type === "member" && check.runWorkspace(node.workspace, [node.member.path]));
+  command("gaanim.member.export", async (node: ProjectsNode) => {
+    const project = node.type === "member" ? loadProject(node.member.root) : undefined;
+    if (project) {
+      await exporter.exportPreset(undefined, [], project);
+    }
+  });
 
   // Preview.
   command("gaanim.preview", () => preview.launch());
@@ -289,16 +364,25 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
     updateContext();
     statusBar.refreshPreview();
     statusBar.refreshCursor(editor);
+    statusBar.refreshMember(editor);
     if (!editor) {
       return;
     }
     const project = projectForDocument(editor.document);
+    const file = editor.document.uri.scheme === "file" ? editor.document.uri.fsPath : undefined;
+    if (file && project && project.kind !== "script" && !ownWorkspace(file)) {
+      // A member's own file: its member becomes the one the shared files run as.
+      workspace.onFile(file, project.root);
+    } else if (file && ownWorkspace(file)) {
+      // What the workspace shares, for its own files' assets and completion.
+      void workspace.describe(file);
+    }
     if (project) {
       rememberProject(project);
       timelineTree.refresh();
       scrubber.post();
       if (editor.document.languageId === "python") {
-        void python.checkProject(project);
+        void python.checkProject(project, file);
         if (!inspect.cached(project) && cli.executable(true)) {
           inspect.refreshSoon(project, 0);
         }
@@ -349,6 +433,13 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
       if (document.uri.scheme !== "file" || !/\.(py|md|toml)$/.test(document.fileName)) {
         return;
       }
+      const root = ownWorkspace(document.uri.fsPath);
+      if (root && workspace.isSharedFile(root, document.uri.fsPath)) {
+        // Every member imports it: every member's timeline is stale.
+        for (const member of workspace.at(root)?.members ?? []) {
+          inspect.invalidate(member.root);
+        }
+      }
       const project = projectForDocument(document);
       if (!project) {
         return;
@@ -390,16 +481,37 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
     }),
   );
 
+  // Any gaanim.toml written may change projects, members and what they share.
   const manifests = vscode.workspace.createFileSystemWatcher("**/gaanim.toml");
-  manifests.onDidCreate(() => {
+  const manifestChanged = () => {
     forgetRoots();
+    workspace.invalidate();
     updateContext();
-  });
-  manifests.onDidDelete(() => {
-    forgetRoots();
-    updateContext();
-  });
+    projectsTree.refresh();
+  };
+  manifests.onDidCreate(manifestChanged);
+  manifests.onDidChange(manifestChanged);
+  manifests.onDidDelete(manifestChanged);
   subscriptions.push(manifests);
+
+  // What `gaanim project` said arrived, or the active member changed.
+  let workspaceTimer: NodeJS.Timeout | undefined;
+  subscriptions.push(
+    workspaceChanged.event(() => {
+      clearTimeout(workspaceTimer);
+      workspaceTimer = setTimeout(() => {
+        updateContext();
+        statusBar.refreshPreview();
+        statusBar.refreshMember();
+        projectsTree.refresh();
+        // A shared module's times, lenses and hints come from the active member.
+        timelineChanged.fire("");
+        for (const editor of vscode.window.visibleTextEditors) {
+          publishAssets(editor.document);
+        }
+      }, 50);
+    }),
+  );
 
   // What the preview and the timeline say.
   const shownSlide = new Map<string, string>();
@@ -449,7 +561,16 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
   }
   onEditor(vscode.window.activeTextEditor);
   void projects.openPending(context);
-  return { previews: preview.status, timeline: inspect.cached, reports: check.lastReport };
+  return {
+    previews: preview.status,
+    timeline: inspect.cached,
+    reports: check.lastReport,
+    workspaceReports: check.lastWorkspaceReport,
+    activeMember: workspace.activeMember,
+    projectFor: projectForFile,
+    environment: python.environment,
+    projects: projectsTree,
+  };
 }
 
 export function deactivate(): void {
