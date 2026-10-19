@@ -310,8 +310,8 @@ export function caps(): Promise<Caps> {
   }
   let cached = capsCache.get(program);
   if (!cached) {
-    cached = Promise.all([output(program, ["--help"]), output(program, ["export", "--help"])]).then(([general, exportHelp]) =>
-      parseCaps(general ?? "", exportHelp ?? ""),
+    cached = Promise.all([output(program, ["--help"]), output(program, ["export", "--help"]), output(program, ["init", "--help"])]).then(
+      ([general, exportHelp, initHelp]) => parseCaps(general ?? "", exportHelp ?? "", initHelp ?? ""),
     );
     capsCache.set(program, cached);
   }

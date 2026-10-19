@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import * as cli from "./cli";
 import { config, expandHome } from "./config";
-import { initWarnings, memberPath, same, Workspace } from "./core/workspace";
+import { InitResult, initResult, initWarnings, memberPath, same, Workspace } from "./core/workspace";
 import { forgetRoots, listProjects, loadProject } from "./project";
 import * as workspace from "./workspace";
 
@@ -152,15 +152,23 @@ async function folderFor(name: string, what: string): Promise<string | undefined
   return path.join(base, expanded);
 }
 
-/** Runs `gaanim init <kind> <dir>` with a progress notification; resolves to its exit code and output. */
-function init(kind: string, dir: string, title: string): Thenable<{ code: number; lines: string[] }> {
+/**
+ * Runs `gaanim init <kind> <dir>` with a progress notification; resolves to
+ * its exit code, its warnings and, from a Gaanim that reports it in JSON,
+ * what it created.
+ */
+async function init(kind: string, dir: string, title: string): Promise<{ code: number } & InitResult> {
+  const json = (await cli.caps()).initJson;
   return vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title },
     () =>
-      new Promise<{ code: number; lines: string[] }>((resolve) => {
-        const job = cli.run(["init", kind, dir], { onExit: (code, lines) => resolve({ code, lines }) });
+      new Promise<{ code: number } & InitResult>((resolve) => {
+        const args = ["init", kind, dir, ...(json ? ["--message-format", "json"] : [])];
+        const job = cli.run(args, {
+          onExit: (code, lines, objects) => resolve({ code, ...(json ? initResult(objects) : { warnings: initWarnings(lines) }) }),
+        });
         if (!job) {
-          resolve({ code: -1, lines: [] });
+          resolve({ code: -1, warnings: [] });
         }
       }),
   );
@@ -214,12 +222,12 @@ export async function newProject(context: vscode.ExtensionContext, kindArg?: str
     await openProject(context, dir);
     return;
   }
-  const { code, lines } = await init(kind, dir, `Creating ${path.basename(dir)} (Python environment included)`);
+  const { code, warnings } = await init(kind, dir, `Creating ${path.basename(dir)} (Python environment included)`);
   if (code !== 0) {
     await failed();
     return;
   }
-  showWarnings(lines);
+  showWarnings(warnings);
   workspace.invalidate();
   forgetRoots();
   if (config.newGit() && !fs.existsSync(path.join(dir, ".git")) && !workspace.rootAbove(path.dirname(dir)) && cli.which("git")) {
@@ -229,8 +237,8 @@ export async function newProject(context: vscode.ExtensionContext, kindArg?: str
 }
 
 /** Shows what `gaanim init` warned about, such as a folder the workspace's `members` leaves out. */
-function showWarnings(lines: string[], manifest?: string): void {
-  for (const warning of initWarnings(lines)) {
+function showWarnings(warnings: string[], manifest?: string): void {
+  for (const warning of warnings) {
     const actions = manifest && /members/.test(warning) ? ["Open gaanim.toml"] : [];
     void vscode.window.showWarningMessage(warning, ...actions).then((choice) => {
       if (choice && manifest) {
@@ -268,12 +276,12 @@ export async function newWorkspace(context: vscode.ExtensionContext, nameArg?: s
     await openProject(context, dir);
     return;
   }
-  const { code, lines } = await init("workspace", dir, `Creating ${path.basename(dir)} (Git repository and Python environment included)`);
+  const { code, warnings } = await init("workspace", dir, `Creating ${path.basename(dir)} (Git repository and Python environment included)`);
   if (code !== 0) {
     await failed();
     return;
   }
-  showWarnings(lines);
+  showWarnings(warnings);
   workspace.invalidate();
   forgetRoots();
   await openProject(context, dir);
@@ -318,12 +326,12 @@ export async function newMember(context: vscode.ExtensionContext, target?: Works
     await openProject(context, dir);
     return;
   }
-  const { code, lines } = await init(kind, dir, `Creating ${path.relative(found.root, dir) || path.basename(dir)} in ${found.name}`);
+  const { code, warnings, created } = await init(kind, dir, `Creating ${path.relative(found.root, dir) || path.basename(dir)} in ${found.name}`);
   if (code !== 0) {
     await failed();
     return;
   }
-  showWarnings(lines, found.manifest);
+  showWarnings(warnings, found.manifest);
   workspace.invalidate();
   forgetRoots();
   const project = loadProject(dir);
@@ -331,9 +339,8 @@ export async function newMember(context: vscode.ExtensionContext, target?: Works
     return;
   }
   // Only a member runs the shared files: `members` may leave the new folder out.
-  const owner = await ownerOf(project.root);
-  if (owner) {
-    workspace.use(owner.root, project.root);
+  if (created ? created.member && created.workspace : await ownerOf(project.root)) {
+    workspace.use(created?.workspace ?? found.root, project.root);
   }
   await openFolder(context, found.root, project.entry, project.name);
 }

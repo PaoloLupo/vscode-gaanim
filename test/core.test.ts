@@ -24,6 +24,7 @@ import {
   extraPathEntry,
   failure,
   groups,
+  initResult,
   initWarnings,
   isShared,
   label,
@@ -513,10 +514,18 @@ describe("takes", () => {
 describe("caps and toml", () => {
   it("reads what the CLI supports from its help", () => {
     const general = "Commands:\n  inspect <SCRIPT_OR_PROJECT> [--json]\nOptions:\n  --listen <stdio|HOST:PORT>\n  --message-format <FORMAT>";
-    assert.deepEqual(parseCaps(general, "--frame <SECONDS|NAME>[,...]"), { listen: true, json: true, inspect: true, names: true, project: false });
-    assert.deepEqual(parseCaps("", ""), { listen: false, json: false, inspect: false, names: false, project: false });
+    assert.deepEqual(parseCaps(general, "--frame <SECONDS|NAME>[,...]"), {
+      listen: true,
+      json: true,
+      inspect: true,
+      names: true,
+      project: false,
+      initJson: false,
+    });
+    assert.deepEqual(parseCaps("", ""), { listen: false, json: false, inspect: false, names: false, project: false, initJson: false });
     const described = `${general}\n  project [PATH] [--json]               Describe the project and workspace`;
     assert.equal(parseCaps(described, "").project, true);
+    assert.equal(parseCaps("", "", "  --message-format <FORMAT>  human (default) or json").initJson, true);
   });
 
   it("reads gaanim.toml's top-level keys", () => {
@@ -583,7 +592,7 @@ describe("workspace", () => {
     );
   });
 
-  it("drops Windows' verbatim prefix from members' errors", () => {
+  it("reads members' errors, without the verbatim prefix older Gaanim gave them", () => {
     const outro = workspace.members[1];
     assert.ok(outro.error?.startsWith("invalid project manifest "), outro.error);
     assert.ok(!outro.error?.includes("\\\\?\\"), outro.error);
@@ -613,6 +622,11 @@ describe("workspace", () => {
       "invalid project manifest C:\\a\\gaanim.toml: missing field `entry`",
     );
     assert.equal(failure("something else\nlast line"), "last line");
+    // Newer Gaanim answers in JSON even then.
+    assert.equal(
+      failure('{\n  "error": "invalid project manifest C:\\\\a\\\\gaanim.toml: unknown project kind `nope`",\n  "path": "C:\\\\a"\n}\n'),
+      "invalid project manifest C:\\a\\gaanim.toml: unknown project kind `nope`",
+    );
   });
 
   it("tells a workspace's manifest from a project's", () => {
@@ -735,6 +749,30 @@ describe("workspace", () => {
       'extras\\teaser is inside workspace ws1, whose members do not include it Add it in gaanim.toml: members = [..., "extras/teaser"]',
       "authoring environment not ready: the project is not a member of its workspace yet",
     ]);
+  });
+
+  it("reads what gaanim init made, in JSON", () => {
+    const lines = (name: string) =>
+      fixture(name)
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const outside = initResult(lines("channel.init.jsonl"));
+    assert.deepEqual(outside.warnings, [
+      'extras\\teaser is inside workspace channel, whose members do not include it Add it in gaanim.toml: members = [..., "extras/teaser"]',
+      "authoring environment not ready: the project is not a member of its workspace yet",
+    ]);
+    assert.deepEqual(outside.created, {
+      kind: "video",
+      root: at("extras", "teaser"),
+      entry: at("extras", "teaser", "main.py"),
+      workspace: CHANNEL,
+      member: false,
+    });
+    const inside = initResult(lines("channel.init-member.jsonl"));
+    assert.deepEqual(inside.warnings, []);
+    assert.equal(inside.created?.member, true);
+    assert.equal(inside.created?.root, at("talks", "retro"));
   });
 
   it("adds to Pylance only the folders it does not find on its own", () => {

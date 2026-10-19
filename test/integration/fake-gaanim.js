@@ -215,12 +215,27 @@ if (args[0] === "--help" && process.env.FAKE_GAANIM_NO_PROJECT) {
   fs.writeFileSync(path.join(dir, "gaanim.toml"), `name = "${path.basename(dir)}"\nkind = "${args[1]}"\nentry = "main.py"\n`);
   fs.writeFileSync(path.join(dir, "main.py"), "from gaanim import Scene\n\nscene = Scene()\nscene.wait(1)\nscene.render()\n");
   const root = workspaceAbove(path.dirname(dir));
-  if (root && !members(root).some((member) => member.root === dir)) {
-    const relative = path.relative(root, dir).split(path.sep).join("/");
-    console.log(`  ! init      ${path.relative(root, dir)} is inside workspace ${readManifest(root).name}, whose members do not include it`);
-    console.log(`              Add it in gaanim.toml: members = [..., "${relative}"]`);
+  const member = Boolean(root && members(root).some((item) => item.root === dir));
+  const outside = root && !member ? path.relative(root, dir) : undefined;
+  const add = outside && `Add it in gaanim.toml: members = [..., "${outside.split(path.sep).join("/")}"]`;
+  if (args.includes("--message-format")) {
+    // As Gaanim 0.15 with `init --message-format json` writes it.
+    if (outside) {
+      emit({ type: "message", level: "warning", label: "init", message: `${outside} is inside workspace ${readManifest(root).name}, whose members do not include it` });
+      emit({ type: "hint", message: add });
+    }
+    emit({ type: "message", level: "success", label: "init", message: `Created ${args[1]} project: ${dir}` });
+    emit({ type: "init", kind: args[1], root: dir, entry: path.join(dir, "main.py"), workspace: root ?? null, member });
+  } else {
+    // As older versions write it, with Windows' verbatim prefix.
+    if (outside) {
+      console.log(`  ! init      ${outside} is inside workspace ${readManifest(root).name}, whose members do not include it`);
+      console.log(`              ${add}`);
+    }
+    console.log(`  ✓ init      Created ${args[1]} project: \\\\?\\${dir}`);
   }
-  console.log(`  ✓ init      Created ${args[1]} project: \\\\?\\${dir}`);
+} else if (args[0] === "init" && args[1] === "--help") {
+  process.stdout.write(`Usage: gaanim init <KIND> [DIRECTORY] [--force]${process.env.FAKE_GAANIM_NO_PROJECT ? "" : " [--message-format <FORMAT>]"}\n`);
 } else if (args[0] === "--help") {
   process.stdout.write(GENERAL);
 } else if (args[0] === "export" && args[1] === "--help") {

@@ -83,7 +83,7 @@ async function ask(target: string): Promise<Described> {
       return { error: "gaanim project printed no JSON." };
     }
   }
-  return { error: failure(`${result.stderr}\n${result.stdout}`) || `gaanim project exited with ${result.code}.` };
+  return { error: failure(result.stdout) || failure(result.stderr) || `gaanim project exited with ${result.code}.` };
 }
 
 /**

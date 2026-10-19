@@ -117,6 +117,14 @@ function decodeMember(raw: Record<string, unknown>, p: ToPath): Member {
   };
 }
 
+function safeParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 }
@@ -170,8 +178,15 @@ export function decode(object: unknown, toPath: (file: string) => string = (file
   return description;
 }
 
-/** Why `gaanim project` gave no description: the text of its `✗` line. */
+/**
+ * Why `gaanim project` gave no description: the `error` of its JSON (newer
+ * Gaanim), else the text of its `✗` line.
+ */
 export function failure(output: string): string {
+  const json = output.trim().startsWith("{") ? record(safeParse(output)) : undefined;
+  if (typeof json?.error === "string") {
+    return stripVerbatim(json.error);
+  }
   const clean = stripVerbatim(output).trim();
   const line = /✗\s+\S+\s+(.*)/.exec(clean);
   return line ? line[1].trim() : clean.split(/\r?\n/).pop() ?? "";
@@ -407,7 +422,38 @@ export function memberPath(workspace: Workspace, kind: string, name?: string, ac
   return name ? prefix + name : prefix;
 }
 
-/** What `gaanim init` warned about, such as a folder `members` leaves out, each warning with the lines that follow it. */
+export interface InitResult {
+  /** Warnings, each with the hints that follow it (the `members` line to add). */
+  warnings: string[];
+  /** The closing `init` line: what was created, and whether it is a member of a workspace. */
+  created?: { kind: string; root: string; entry?: string; workspace?: string; member: boolean };
+}
+
+/** Reads the JSON lines of `gaanim init --message-format json`. */
+export function initResult(objects: Record<string, unknown>[]): InitResult {
+  const result: InitResult = { warnings: [] };
+  let last: number | undefined;
+  for (const object of objects) {
+    if (object.type === "message" && object.level === "warning" && typeof object.message === "string") {
+      last = result.warnings.push(stripVerbatim(object.message)) - 1;
+    } else if (object.type === "hint" && typeof object.message === "string" && last !== undefined) {
+      result.warnings[last] += ` ${stripVerbatim(object.message)}`;
+    } else if (object.type === "init" && typeof object.root === "string") {
+      result.created = {
+        kind: text(object.kind) ?? "",
+        root: plain(object.root) ?? object.root,
+        entry: plain(object.entry),
+        workspace: plain(object.workspace),
+        member: object.member === true,
+      };
+    } else if (object.type === "message") {
+      last = undefined;
+    }
+  }
+  return result;
+}
+
+/** What an older `gaanim init` warned about in its text, such as a folder `members` leaves out, each warning with the lines that follow it. */
 export function initWarnings(lines: string[]): string[] {
   const found: string[] = [];
   let open = false;

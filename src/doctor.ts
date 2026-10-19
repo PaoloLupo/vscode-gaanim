@@ -36,6 +36,7 @@ export async function doctor(): Promise<void> {
     feature(caps.inspect, "inspect", "times in the code, the timeline view, stills at the cursor");
     feature(caps.names, "export by name", "stills and ranges of the slide at the cursor");
     feature(caps.project, "project", "workspaces: members, shared Python and assets, the environment of each file");
+    feature(caps.initJson, "init --message-format json", "what New Project and New Member created, and Gaanim's warnings, read exactly");
   }
   for (const tool of ["ffmpeg", "ffprobe"]) {
     if (cli.which(tool)) {

@@ -38,7 +38,7 @@
       },
       {
         "entry": null,
-        "error": "invalid project manifest \\\\?\\{root}/videos/outro/gaanim.toml: unknown project kind `nope`; available kinds: video, slides",
+        "error": "invalid project manifest {root}/videos/outro/gaanim.toml: unknown project kind `nope`; available kinds: video, slides",
         "group": "Videos",
         "kind": null,
         "name": "outro",
