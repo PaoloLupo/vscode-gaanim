@@ -7,8 +7,8 @@ Code. The extension drives the `gaanim` command: it creates projects, keeps
 the live preview on the line you are editing, puts problems on their lines,
 exports, presents, and keeps the narration script beside the code. It brings
 everything [gaanim.nvim](https://github.com/PaoloLupo/gaanim.nvim) does to VS
-Code, and uses Gaanim 0.13's editor channel (`--listen`), JSON messages and
-`gaanim inspect`.
+Code, and uses Gaanim's editor channel (`--listen`), JSON messages,
+`gaanim inspect` and, for workspaces, `gaanim project`.
 
 | Command | What it does |
 |---|---|
@@ -147,8 +147,9 @@ per project, as before.
 ## Requirements
 
 - VS Code 1.90 or newer (or Cursor, VSCodium).
-- `gaanim` on `PATH`, or `gaanim.path` set. Gaanim 0.13 has everything; older
-  versions work with less (see below).
+- `gaanim` on `PATH`, or `gaanim.path` set. Gaanim 0.15 has everything
+  (workspaces need its `gaanim project`); older versions work with less (see
+  below).
 - The Python extension (with Pylance or basedpyright) for completion of the
   Gaanim API.
 

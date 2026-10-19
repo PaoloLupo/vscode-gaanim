@@ -2,7 +2,7 @@
   "name": "gaanim",
   "displayName": "Gaanim",
   "description": "Write Gaanim videos and slides: a live preview that follows your code, times in the code, the narration script beside it, checks, exports and presenting.",
-  "version": "0.13.0",
+  "version": "0.15.0",
   "publisher": "paololupo",
   "license": "MIT OR Apache-2.0",
   "icon": "images/icon.png",

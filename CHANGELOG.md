@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.0
 
 Gaanim workspaces: several projects in one repository that share Python
 code, assets and one `.venv`. The extension asks `gaanim project --json`
