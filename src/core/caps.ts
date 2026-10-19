@@ -9,9 +9,11 @@ export interface Caps {
   inspect: boolean;
   /** `export --frame/--from/--to` take segment and stop names. */
   names: boolean;
+  /** `gaanim project --json`, and with it workspaces. */
+  project: boolean;
 }
 
-export const NO_CAPS: Caps = { listen: false, json: false, inspect: false, names: false };
+export const NO_CAPS: Caps = { listen: false, json: false, inspect: false, names: false, project: false };
 
 /** What `gaanim --help` and `gaanim export --help` say the executable supports. */
 export function parseCaps(general: string, exportHelp: string): Caps {
@@ -20,5 +22,6 @@ export function parseCaps(general: string, exportHelp: string): Caps {
     json: (general + exportHelp).includes("--message-format"),
     inspect: /\n\s+inspect\s/.test(general),
     names: exportHelp.includes("<SECONDS|NAME>"),
+    project: /\n\s+project\s/.test(general),
   };
 }

@@ -24,6 +24,7 @@ Commands:
   init <video|slides> [DIR]       Create a project
   inspect <SCRIPT_OR_PROJECT> [--json]  List the timeline
   export <SCRIPT_OR_PROJECT>      Export
+  project [PATH] [--json]         Describe the project and workspace a file or folder belongs to
 
 Options:
   --listen <stdio|HOST:PORT>      Let an editor drive the preview
@@ -37,7 +38,190 @@ const EXPORT = `Options:
   --message-format <FORMAT>
 `;
 
-if (args[0] === "--help") {
+// Workspaces, as far as the test fixture `channel` needs: `members` with
+// `dir/*` patterns and groups, `exclude`, and `[workspace.shared]`.
+
+/** The quoted strings of a manifest's `key = [...]` (over several lines), with each `{ path, group }` entry's group. */
+function listOf(text, key) {
+  const match = new RegExp(`^${key}\\s*=\\s*\\[([\\s\\S]*?)\\][^\\n]*$`, "m").exec(text);
+  if (!match) {
+    return undefined;
+  }
+  const entries = [];
+  for (const part of match[1].replace(/#.*$/gm, "").matchAll(/\{([^}]*)\}|"([^"]*)"/g)) {
+    if (part[1] !== undefined) {
+      entries.push({ path: /path\s*=\s*"([^"]*)"/.exec(part[1])?.[1], group: /group\s*=\s*"([^"]*)"/.exec(part[1])?.[1] });
+    } else {
+      entries.push({ path: part[2] });
+    }
+  }
+  return entries;
+}
+
+function isWorkspace(dir) {
+  try {
+    return /^\[workspace\]/m.test(fs.readFileSync(path.join(dir, "gaanim.toml"), "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+function workspaceAbove(target) {
+  let dir = fs.existsSync(target) && fs.statSync(target).isDirectory() ? target : path.dirname(target);
+  for (;;) {
+    if (isWorkspace(dir)) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
+  }
+}
+
+function readManifest(dir) {
+  const text = fs.readFileSync(path.join(dir, "gaanim.toml"), "utf8");
+  const value = (key) => new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, "m").exec(text)?.[1];
+  return { text, name: value("name") ?? path.basename(dir), kind: value("kind"), entry: value("entry") };
+}
+
+function members(root) {
+  const { text } = readManifest(root);
+  const workspaceText = text.slice(text.indexOf("[workspace]"));
+  const excluded = (listOf(workspaceText, "exclude") ?? []).map((entry) => entry.path);
+  const found = [];
+  for (const entry of listOf(workspaceText, "members") ?? []) {
+    const [parent, name] = entry.path.split("/");
+    const dirs = name === "*" ? (fs.existsSync(path.join(root, parent)) ? fs.readdirSync(path.join(root, parent)).sort() : []) : [name];
+    for (const dir of dirs) {
+      const memberPath = `${parent}/${dir}`;
+      const memberRoot = path.join(root, parent, dir);
+      if (excluded.includes(memberPath) || !fs.existsSync(path.join(memberRoot, "gaanim.toml"))) {
+        continue;
+      }
+      const manifest = readManifest(memberRoot);
+      const valid = manifest.kind === "video" || manifest.kind === "slides";
+      found.push({
+        path: memberPath,
+        name: manifest.name,
+        group: entry.group ?? parent,
+        root: memberRoot,
+        kind: valid ? manifest.kind : null,
+        entry: valid ? path.join(memberRoot, manifest.entry ?? "main.py") : null,
+        error: valid ? null : `invalid project manifest \\\\?\\${path.join(memberRoot, "gaanim.toml")}: unknown project kind \`${manifest.kind}\``,
+      });
+    }
+  }
+  return found;
+}
+
+function shared(root, key, fallback) {
+  const { text } = readManifest(root);
+  const section = text.includes("[workspace.shared]") ? text.slice(text.indexOf("[workspace.shared]")) : "";
+  return (listOf(section, key)?.map((entry) => entry.path) ?? [fallback])
+    .map((name) => path.join(root, name))
+    .filter((dir) => fs.existsSync(dir));
+}
+
+function describe(target) {
+  const root = workspaceAbove(target);
+  let dir = fs.existsSync(target) && fs.statSync(target).isDirectory() ? target : path.dirname(target);
+  let projectRoot;
+  for (let up = dir; ; up = path.dirname(up)) {
+    if (fs.existsSync(path.join(up, "gaanim.toml")) && readManifest(up).kind) {
+      projectRoot = up;
+      break;
+    }
+    if (up === root || path.dirname(up) === up) {
+      break;
+    }
+  }
+  const all = root ? members(root) : [];
+  // A project inside the workspace that `members` leaves out stands alone.
+  const outside = projectRoot && root && projectRoot !== root && !all.some((member) => member.root === projectRoot);
+  const own = projectRoot ? readManifest(projectRoot) : undefined;
+  const venv = root ?? projectRoot;
+  const list = outside ? [] : all;
+  const interpreter = venv && path.join(venv, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  return {
+    path: target,
+    project: own
+      ? {
+          name: own.name,
+          display_name: root ? `${readManifest(root).name} › ${own.name}` : own.name,
+          kind: own.kind,
+          root: projectRoot,
+          manifest: path.join(projectRoot, "gaanim.toml"),
+          entry: path.join(projectRoot, own.entry ?? "main.py"),
+          assets_dir: path.join(projectRoot, "assets"),
+          output_dir: path.join(projectRoot, "exports"),
+          language: null,
+        }
+      : null,
+    workspace: root && !outside
+      ? {
+          name: readManifest(root).name,
+          root,
+          manifest: path.join(root, "gaanim.toml"),
+          cover: null,
+          python: shared(root, "python", "src"),
+          assets: shared(root, "assets", "assets"),
+          members: list,
+        }
+      : null,
+    python: {
+      paths: [...new Set([dir, ...(projectRoot ? [projectRoot] : []), ...(root && !outside ? [...shared(root, "python", "src"), root] : [])])],
+      venv: interpreter && fs.existsSync(interpreter) ? path.dirname(path.dirname(interpreter)) : null,
+      interpreter: interpreter && fs.existsSync(interpreter) ? interpreter : null,
+    },
+  };
+}
+
+const target = args[1] && !args[1].startsWith("-") ? path.resolve(args[1]) : undefined;
+
+if (args[0] === "--help" && process.env.FAKE_GAANIM_NO_PROJECT) {
+  // An older gaanim, without `project` and so without workspaces.
+  process.stdout.write(GENERAL.replace(/^ {2}project .*\n/m, ""));
+} else if (args[0] === "project") {
+  emit(describe(target ?? process.cwd()));
+} else if (args[0] === "check" && target && isWorkspace(target)) {
+  // The captured output of the real `gaanim check` of the fixture.
+  const fixture = path.join(__dirname, "..", "fixtures", "channel.check.jsonl");
+  process.stdout.write(fs.readFileSync(fixture, "utf8").replaceAll("{root}", target.replace(/\\/g, "/")));
+  process.exit(1);
+} else if (args[0] === "export" && target && isWorkspace(target)) {
+  const output = args[args.indexOf("--output") + 1];
+  const list = members(target);
+  let passed = 0;
+  for (const member of list) {
+    if (member.error) {
+      emit({ type: "message", level: "error", label: "export", message: `${member.path}: ${member.error}` });
+      continue;
+    }
+    const file = output.replace("{member}", member.path);
+    emit({ type: "message", level: "info", label: "export", message: `${member.path} · ${file}` });
+    emit({ type: "progress", current: 1, percent: 100, done: true });
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "fake export");
+    emit({ type: "message", level: "success", label: "export", message: `wrote ${file}` });
+    passed++;
+  }
+  emit({ type: "workspace", name: readManifest(target).name, members: list.length, passed, failed: list.length - passed });
+  process.exit(passed === list.length ? 0 : 1);
+} else if (args[0] === "init" && (args[1] === "video" || args[1] === "slides")) {
+  const dir = path.resolve(args[2]);
+  fs.mkdirSync(path.join(dir, "assets"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "gaanim.toml"), `name = "${path.basename(dir)}"\nkind = "${args[1]}"\nentry = "main.py"\n`);
+  fs.writeFileSync(path.join(dir, "main.py"), "from gaanim import Scene\n\nscene = Scene()\nscene.wait(1)\nscene.render()\n");
+  const root = workspaceAbove(path.dirname(dir));
+  if (root && !members(root).some((member) => member.root === dir)) {
+    const relative = path.relative(root, dir).split(path.sep).join("/");
+    console.log(`  ! init      ${path.relative(root, dir)} is inside workspace ${readManifest(root).name}, whose members do not include it`);
+    console.log(`              Add it in gaanim.toml: members = [..., "${relative}"]`);
+  }
+  console.log(`  ✓ init      Created ${args[1]} project: \\\\?\\${dir}`);
+} else if (args[0] === "--help") {
   process.stdout.write(GENERAL);
 } else if (args[0] === "export" && args[1] === "--help") {
   process.stdout.write(EXPORT);

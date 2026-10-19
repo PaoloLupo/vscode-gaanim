@@ -56,6 +56,18 @@
         "icon": "$(new-folder)"
       },
       {
+        "command": "gaanim.newWorkspace",
+        "title": "New Workspace…",
+        "category": "Gaanim",
+        "icon": "$(folder-library)"
+      },
+      {
+        "command": "gaanim.newMember",
+        "title": "New Member of the Workspace…",
+        "category": "Gaanim",
+        "icon": "$(add)"
+      },
+      {
         "command": "gaanim.openProject",
         "title": "Open Project…",
         "category": "Gaanim",
@@ -147,8 +159,20 @@
         "icon": "$(checklist)"
       },
       {
+        "command": "gaanim.checkWorkspace",
+        "title": "Check All Members",
+        "category": "Gaanim",
+        "icon": "$(checklist)"
+      },
+      {
         "command": "gaanim.export",
         "title": "Export…",
+        "category": "Gaanim",
+        "icon": "$(export)"
+      },
+      {
+        "command": "gaanim.exportWorkspace",
+        "title": "Export All Members…",
         "category": "Gaanim",
         "icon": "$(export)"
       },
@@ -266,6 +290,41 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "gaanim.useMember",
+        "title": "Run Shared Files as Member…",
+        "category": "Gaanim",
+        "icon": "$(file-submodule)"
+      },
+      {
+        "command": "gaanim.workspace.newVideo",
+        "title": "New Video",
+        "icon": "$(device-camera-video)"
+      },
+      {
+        "command": "gaanim.workspace.newSlides",
+        "title": "New Presentation",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "gaanim.member.open",
+        "title": "Open Member"
+      },
+      {
+        "command": "gaanim.member.use",
+        "title": "Run Shared Files as This Member",
+        "icon": "$(file-submodule)"
+      },
+      {
+        "command": "gaanim.member.check",
+        "title": "Check Member",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "gaanim.member.export",
+        "title": "Export Member…",
+        "icon": "$(export)"
+      },
+      {
         "command": "gaanim.entry.preview",
         "title": "Preview Here",
         "icon": "$(play-circle)"
@@ -344,6 +403,46 @@
         {
           "command": "gaanim.scriptToCode",
           "when": "gaanim.inProject"
+        },
+        {
+          "command": "gaanim.workspace.newVideo",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.workspace.newSlides",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.member.open",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.member.use",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.member.check",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.member.export",
+          "when": "false"
+        },
+        {
+          "command": "gaanim.newMember",
+          "when": "gaanim.inWorkspace"
+        },
+        {
+          "command": "gaanim.checkWorkspace",
+          "when": "gaanim.inWorkspace"
+        },
+        {
+          "command": "gaanim.exportWorkspace",
+          "when": "gaanim.inWorkspace"
+        },
+        {
+          "command": "gaanim.useMember",
+          "when": "gaanim.inWorkspace"
         }
       ],
       "editor/title": [
@@ -430,6 +529,11 @@
           "command": "gaanim.refreshProjects",
           "when": "view == gaanim.projects",
           "group": "navigation@2"
+        },
+        {
+          "command": "gaanim.newWorkspace",
+          "when": "view == gaanim.projects",
+          "group": "1_new@1"
         }
       ],
       "view/item/context": [
@@ -457,6 +561,66 @@
           "command": "gaanim.entry.script",
           "when": "view == gaanim.timeline && viewItem =~ /slide|voiceover/",
           "group": "1_entry@3"
+        },
+        {
+          "command": "gaanim.workspace.newVideo",
+          "when": "view == gaanim.projects && viewItem == gaanim.workspace",
+          "group": "inline@1"
+        },
+        {
+          "command": "gaanim.workspace.newSlides",
+          "when": "view == gaanim.projects && viewItem == gaanim.workspace",
+          "group": "inline@2"
+        },
+        {
+          "command": "gaanim.checkWorkspace",
+          "when": "view == gaanim.projects && viewItem =~ /^gaanim\\.(workspace|group)$/",
+          "group": "inline@3"
+        },
+        {
+          "command": "gaanim.workspace.newVideo",
+          "when": "view == gaanim.projects && viewItem == gaanim.workspace",
+          "group": "1_new@1"
+        },
+        {
+          "command": "gaanim.workspace.newSlides",
+          "when": "view == gaanim.projects && viewItem == gaanim.workspace",
+          "group": "1_new@2"
+        },
+        {
+          "command": "gaanim.checkWorkspace",
+          "when": "view == gaanim.projects && viewItem =~ /^gaanim\\.(workspace|group)$/",
+          "group": "2_run@1"
+        },
+        {
+          "command": "gaanim.exportWorkspace",
+          "when": "view == gaanim.projects && viewItem =~ /^gaanim\\.(workspace|group)$/",
+          "group": "2_run@2"
+        },
+        {
+          "command": "gaanim.member.check",
+          "when": "view == gaanim.projects && viewItem =~ /^gaanim\\.member/",
+          "group": "inline@1"
+        },
+        {
+          "command": "gaanim.member.export",
+          "when": "view == gaanim.projects && viewItem == gaanim.member",
+          "group": "inline@2"
+        },
+        {
+          "command": "gaanim.member.use",
+          "when": "view == gaanim.projects && viewItem == gaanim.member",
+          "group": "1_member@1"
+        },
+        {
+          "command": "gaanim.member.check",
+          "when": "view == gaanim.projects && viewItem =~ /^gaanim\\.member/",
+          "group": "1_member@2"
+        },
+        {
+          "command": "gaanim.member.export",
+          "when": "view == gaanim.projects && viewItem == gaanim.member",
+          "group": "1_member@3"
         }
       ]
     },
@@ -616,7 +780,7 @@
       },
       {
         "view": "gaanim.projects",
-        "contents": "Set `gaanim.projectsDir` to list your projects here.\n[Open Settings](command:workbench.action.openSettings?%5B%22gaanim.projectsDir%22%5D)\n[New Project](command:gaanim.new)"
+        "contents": "Set `gaanim.projectsDir` to list your projects and workspaces here. A workspace open in this window shows here with its members.\n[Open Settings](command:workbench.action.openSettings?%5B%22gaanim.projectsDir%22%5D)\n[New Project](command:gaanim.new)\n[New Workspace](command:gaanim.newWorkspace)"
       }
     ],
     "snippets": [
@@ -707,7 +871,7 @@
           "type": "string",
           "default": "",
           "scope": "machine",
-          "markdownDescription": "Where **New Project** creates projects and the Projects view looks. `~` is your home folder."
+          "markdownDescription": "Where **New Project** and **New Workspace** create folders and the Projects view looks. `~` is your home folder."
         },
         "gaanim.new.git": {
           "type": "boolean",
@@ -962,7 +1126,12 @@
             "never"
           ],
           "default": "ask",
-          "markdownDescription": "Point the Python extension at the project's `.venv`, where `gaanim init` installed the authoring package and its type stubs."
+          "markdownDescription": "Point the Python extension at the project's `.venv` (in a workspace, the one at its root), where `gaanim init` installed the authoring package and its type stubs, and add to `python.analysis.extraPaths` the folders of the workspace's `sys.path` that Pylance does not search on its own."
+        },
+        "gaanim.workspace.output": {
+          "type": "string",
+          "default": "exports/{member}",
+          "markdownDescription": "Where **Export All Members** writes, relative to the workspace: `{member}` becomes each member's path (`exports/videos/intro.mp4`), and the preset adds its suffix and extension."
         }
       }
     }

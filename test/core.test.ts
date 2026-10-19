@@ -16,6 +16,30 @@ import { findPhrase, normalizeWord, TakeTiming, textWords, voiceoverBlocks } fro
 import { glyph, mathItems, scan } from "../src/core/typst";
 import { cmdQuote, launch } from "../src/core/spawn";
 import { readTopLevel } from "../src/core/toml";
+import {
+  checkSummary,
+  count,
+  decode,
+  exportStart,
+  extraPathEntry,
+  failure,
+  groups,
+  initWarnings,
+  isShared,
+  label,
+  manifestInfo,
+  member,
+  memberAt,
+  memberPath,
+  memberReports,
+  missingSearchPaths,
+  resolveExtraPath,
+  same,
+  splitCheck,
+  stripVerbatim,
+  within,
+  workspaceOutput,
+} from "../src/core/workspace";
 
 const FIXTURES = path.join(__dirname, "..", "..", "test", "fixtures");
 const ROOT = path.join(FIXTURES, "talk");
@@ -489,8 +513,10 @@ describe("takes", () => {
 describe("caps and toml", () => {
   it("reads what the CLI supports from its help", () => {
     const general = "Commands:\n  inspect <SCRIPT_OR_PROJECT> [--json]\nOptions:\n  --listen <stdio|HOST:PORT>\n  --message-format <FORMAT>";
-    assert.deepEqual(parseCaps(general, "--frame <SECONDS|NAME>[,...]"), { listen: true, json: true, inspect: true, names: true });
-    assert.deepEqual(parseCaps("", ""), { listen: false, json: false, inspect: false, names: false });
+    assert.deepEqual(parseCaps(general, "--frame <SECONDS|NAME>[,...]"), { listen: true, json: true, inspect: true, names: true, project: false });
+    assert.deepEqual(parseCaps("", ""), { listen: false, json: false, inspect: false, names: false, project: false });
+    const described = `${general}\n  project [PATH] [--json]               Describe the project and workspace`;
+    assert.equal(parseCaps(described, "").project, true);
   });
 
   it("reads gaanim.toml's top-level keys", () => {
@@ -521,5 +547,225 @@ describe("spawn", () => {
       shell: false,
     });
     assert.deepEqual(launch("/usr/bin/gaanim.cmd", ["a b"], "linux"), { command: "/usr/bin/gaanim.cmd", args: ["a b"], shell: false });
+  });
+});
+
+describe("workspace", () => {
+  const CHANNEL = path.join(FIXTURES, "channel");
+  const at = (...parts: string[]) => path.join(CHANNEL, ...parts);
+  const fixture = (name: string) => fs.readFileSync(path.join(FIXTURES, name), "utf8").replaceAll("{root}", CHANNEL.replace(/\\/g, "/"));
+  const description = decode(JSON.parse(fixture("channel.project.json")));
+  const workspace = description.workspace!;
+  const checkLines = fixture("channel.check.jsonl")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+  it("reads what gaanim project says, with the extension's paths", () => {
+    assert.equal(description.path, at("videos", "intro", "main.py"));
+    assert.equal(description.project?.displayName, "channel › intro");
+    assert.equal(description.project?.root, at("videos", "intro"));
+    assert.equal(description.project?.language, undefined);
+    assert.deepEqual(description.python.paths, [at("videos", "intro"), at("common"), CHANNEL]);
+    assert.equal(description.python.interpreter, at(".venv", "Scripts", "python.exe"));
+    assert.equal(workspace.name, "channel");
+    assert.equal(workspace.root, CHANNEL);
+    assert.deepEqual(workspace.python, [at("common")]);
+    assert.deepEqual(workspace.assets, [at("media")]);
+    assert.equal(workspace.cover, undefined);
+    assert.deepEqual(
+      workspace.members.map((m) => [m.path, m.group, m.kind ?? null, m.entry ? path.relative(CHANNEL, m.entry) : null]),
+      [
+        ["videos/intro", "Videos", "video", path.join("videos", "intro", "main.py")],
+        ["videos/outro", "Videos", null, null],
+        ["talks/kickoff", "talks", "slides", path.join("talks", "kickoff", "main.py")],
+      ],
+    );
+  });
+
+  it("drops Windows' verbatim prefix from members' errors", () => {
+    const outro = workspace.members[1];
+    assert.ok(outro.error?.startsWith("invalid project manifest "), outro.error);
+    assert.ok(!outro.error?.includes("\\\\?\\"), outro.error);
+    assert.ok(outro.error?.includes("unknown project kind `nope`"));
+    assert.equal(stripVerbatim("at \\\\?\\C:\\x\\gaanim.toml"), "at C:\\x\\gaanim.toml");
+    assert.equal(stripVerbatim("\\\\?\\UNC\\server\\share"), "\\\\server\\share");
+  });
+
+  it("tolerates a description outside any project", () => {
+    const outside = decode({ path: "/tmp/x", project: null, workspace: null, python: { interpreter: null, paths: ["/tmp/x"], venv: null } });
+    assert.equal(outside.project, undefined);
+    assert.equal(outside.workspace, undefined);
+    assert.equal(outside.python.interpreter, undefined);
+    assert.deepEqual(decode(null).python.paths, []);
+  });
+
+  it("writes every path through the editor's own form", () => {
+    const lower = decode(JSON.parse(fixture("channel.project.json")), (file) => file.toLowerCase());
+    assert.equal(lower.workspace?.root, CHANNEL.toLowerCase());
+    assert.equal(lower.workspace?.members[2].entry, at("talks", "kickoff", "main.py").toLowerCase());
+    assert.deepEqual(lower.python.paths, description.python.paths.map((dir) => dir.toLowerCase()));
+  });
+
+  it("gives the reason gaanim project failed", () => {
+    assert.equal(
+      failure("  ✗ project   invalid project manifest \\\\?\\C:\\a\\gaanim.toml: missing field `entry`\n"),
+      "invalid project manifest C:\\a\\gaanim.toml: missing field `entry`",
+    );
+    assert.equal(failure("something else\nlast line"), "last line");
+  });
+
+  it("tells a workspace's manifest from a project's", () => {
+    const root = manifestInfo(fs.readFileSync(at("gaanim.toml"), "utf8"));
+    assert.deepEqual(root, { project: false, workspace: true, name: "channel", python: ["common"], assets: ["media"] });
+    const intro = manifestInfo(fs.readFileSync(at("videos", "intro", "gaanim.toml"), "utf8"));
+    assert.equal(intro.project, true);
+    assert.equal(intro.workspace, false);
+    assert.equal(manifestInfo('assets_dir = "assets"\n').project, false);
+    const both = manifestInfo('kind = "video"\nentry = "main.py"\n\n[workspace]\nmembers = ["ep-*"]\n');
+    assert.deepEqual([both.project, both.workspace], [true, true]);
+  });
+
+  it("finds the member of a file and the shared modules", () => {
+    assert.equal(memberAt(workspace, at("videos", "intro", "scenes", "title.py"))?.path, "videos/intro");
+    assert.equal(memberAt(workspace, at("common", "style.py")), undefined);
+    assert.equal(memberAt(workspace, at("videos", "intro2", "main.py")), undefined);
+    assert.equal(member(workspace, "talks/kickoff")?.name, "Kickoff");
+    assert.equal(member(workspace, at("talks", "kickoff"))?.name, "Kickoff");
+    assert.ok(isShared(workspace.python, at("common", "style.py")));
+    assert.ok(!isShared(workspace.python, at("sketch.py")));
+    assert.ok(within(at("common"), CHANNEL));
+    assert.ok(same(at("common") + path.sep, at("common")));
+  });
+
+  it("groups members as the manifest lists them", () => {
+    assert.deepEqual(
+      groups(workspace).map((group) => [group.name, group.members.map((m) => m.name)]),
+      [
+        ["Videos", ["intro", "outro"]],
+        ["talks", ["Kickoff"]],
+      ],
+    );
+    assert.equal(label(workspace.members[0]), "Videos › intro");
+    assert.equal(count(1), "1 member");
+    assert.equal(count(3), "3 members");
+  });
+
+  it("splits a workspace check by member", () => {
+    const { parts, rest, summary } = splitCheck(checkLines);
+    assert.deepEqual(
+      parts.map((part) => [part.member, part.objects.length]),
+      [
+        ["videos/intro", 0],
+        ["videos/outro", 1],
+        ["talks/kickoff", 3],
+      ],
+    );
+    assert.deepEqual(rest, []);
+    assert.deepEqual(summary, { members: 3, passed: 1, failed: 2 });
+  });
+
+  it("gives each member its report, an invalid one its error on the manifest", () => {
+    const context = (item: { root: string }): LocateContext => ({
+      root: item.root,
+      fallback: path.join(item.root, "gaanim.toml"),
+      locate: () => undefined,
+    });
+    const reports = memberReports(workspace, checkLines, context);
+    assert.deepEqual(
+      reports.map(({ member: m, report }) => [m.path, report.status]),
+      [
+        ["videos/intro", "pass"],
+        ["videos/outro", "error"],
+        ["talks/kickoff", "error"],
+      ],
+    );
+    const outro = reports[1].report;
+    assert.equal(outro.problems.length, 1);
+    assert.equal(outro.problems[0].file, at("videos", "outro", "gaanim.toml"));
+    assert.match(outro.problems[0].text, /unknown project kind `nope`/);
+    assert.ok(!outro.problems[0].text.includes("\\\\?\\"));
+    const kickoff = reports[2].report;
+    assert.deepEqual(
+      kickoff.problems.map((p) => [p.severity, path.relative(CHANNEL, p.file), p.line]),
+      [
+        ["error", path.join("talks", "kickoff", "main.py"), 6],
+        ["warning", path.join("talks", "kickoff", "main.py"), 6],
+        ["warning", path.join("talks", "kickoff", "gaanim.toml"), 1],
+      ],
+    );
+    assert.equal(
+      checkSummary(reports.map(({ member: m, report }) => ({ member: m.path, status: report.status }))),
+      "1 of 3 members passed · failed: videos/outro, talks/kickoff",
+    );
+    assert.equal(
+      checkSummary([
+        { member: "a", status: "pass" },
+        { member: "b", status: "warning" },
+      ]),
+      "2 of 2 members passed · 1 with warnings",
+    );
+  });
+
+  it("names the outputs of a workspace export", () => {
+    assert.equal(workspaceOutput(CHANNEL, "exports/{member}", "", "mp4"), at("exports", "{member}.mp4"));
+    assert.equal(workspaceOutput(CHANNEL, "renders", "-draft", "mp4"), at("renders", "{member}-draft.mp4"));
+    assert.equal(workspaceOutput(CHANNEL, "out/{member}/video", "", "webm"), at("out", "{member}", "video.webm"));
+    assert.equal(exportStart("videos/intro · exports/videos\\intro.png"), "videos/intro");
+    assert.equal(exportStart("wrote exports/videos\\intro.png"), undefined);
+  });
+
+  it("puts a new member beside the others of its kind", () => {
+    assert.equal(memberPath(workspace, "video"), "videos/");
+    assert.equal(memberPath(workspace, "slides", "retro"), "talks/retro");
+    assert.equal(memberPath(workspace, "video", "season-2/ep1"), "season-2/ep1");
+    assert.equal(memberPath(workspace, "slides", "x", at("talks", "kickoff")), "talks/x");
+    assert.equal(memberPath({ ...workspace, members: [] }, "video", "intro"), "intro");
+  });
+
+  it("reads the warnings of gaanim init", () => {
+    const lines = [
+      "  ! init      extras\\teaser is inside workspace ws1, whose members do not include it",
+      '              Add it in gaanim.toml: members = [..., "extras/teaser"]',
+      "  ✓ init      Created video project: \\\\?\\C:\\ws1\\extras\\teaser",
+      "              Edit:       \\\\?\\C:\\ws1\\extras\\teaser\\main.py",
+      "  ! python    authoring environment not ready: the project is not a member of its workspace yet",
+    ];
+    assert.deepEqual(initWarnings(lines), [
+      'extras\\teaser is inside workspace ws1, whose members do not include it Add it in gaanim.toml: members = [..., "extras/teaser"]',
+      "authoring environment not ready: the project is not a member of its workspace yet",
+    ]);
+  });
+
+  it("adds to Pylance only the folders it does not find on its own", () => {
+    const file = at("videos", "intro", "main.py");
+    // The window opened at the workspace: its root and src are searched already.
+    assert.deepEqual(missingSearchPaths(description.python.paths, { file, folder: CHANNEL, autoSearchPaths: true, extraPaths: [] }), [
+      at("common"),
+    ]);
+    assert.deepEqual(
+      missingSearchPaths([at("src"), at("common"), CHANNEL], { file, folder: CHANNEL, autoSearchPaths: true, extraPaths: ["common"] }),
+      [],
+    );
+    assert.deepEqual(
+      missingSearchPaths([at("src"), CHANNEL], { file, folder: CHANNEL, autoSearchPaths: false, extraPaths: ["${workspaceFolder}/other"] }),
+      [at("src")],
+    );
+    // A file in a member's subfolder: the member's own folder is missing too.
+    const nested = at("videos", "intro", "scenes", "title.py");
+    const paths = [at("videos", "intro", "scenes"), at("videos", "intro"), at("common"), CHANNEL];
+    assert.deepEqual(missingSearchPaths(paths, { file: nested, folder: CHANNEL, autoSearchPaths: true, extraPaths: [] }), [
+      at("videos", "intro"),
+      at("common"),
+    ]);
+    // The window opened at the member: the workspace's folders are outside it.
+    assert.deepEqual(
+      missingSearchPaths(description.python.paths, { file, folder: at("videos", "intro"), autoSearchPaths: true, extraPaths: [] }),
+      [at("common"), CHANNEL],
+    );
+    assert.equal(extraPathEntry(at("common"), CHANNEL), "common");
+    assert.equal(extraPathEntry(at("videos", "intro"), CHANNEL), "videos/intro");
+    assert.equal(extraPathEntry(CHANNEL, at("videos", "intro")), CHANNEL);
+    assert.equal(resolveExtraPath("common", CHANNEL), at("common"));
   });
 });

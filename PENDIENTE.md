@@ -110,6 +110,18 @@ También vale `npm run package` e instalar el `.vsix` resultante
 5. **Atajos**: todos van bajo `Ctrl+Alt+G` y el nudge es
    `Ctrl+Alt+A` / `Ctrl+Alt+X`. Revisar que no choquen con los tuyos.
 
+6. **Workspaces** (Gaanim 0.15, `gaanim project`): la suite
+   `test/integration/workspace.ts` pasa 12/12 con el `gaanim` falso y 12/12
+   con el real sobre una copia de `test/fixtures/channel` con `.venv`
+   (`GAANIM_TEST_WORKSPACE`). Con Pylance de verdad (copia de las extensiones
+   de Python en una instancia de prueba) el intérprete pasa al `.venv` del
+   workspace y `python.analysis.extraPaths` recibe `common`, con lo que
+   `import style` se resuelve. Queda verlo a mano: la pregunta del modo
+   `ask`, la vista *Projects* (iconos, botones en línea, menús), el elector
+   de miembro y la barra de estado en un módulo compartido, *New Workspace…*
+   (abre otra carpeta) y el aviso de `members` al crear un miembro fuera de
+   los patrones.
+
 ## 4. Cosas por decidir o mejorar
 
 - **CI**: `.github/workflows/ci.yml` corre en Linux, Windows y macOS

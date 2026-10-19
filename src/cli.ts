@@ -264,6 +264,42 @@ export function output(program: string, args: string[], timeout = 10_000): Promi
   });
 }
 
+/** Runs `gaanim <args>` without logging it and collects stdout, stderr and the exit code; undefined when it cannot start. */
+export function capture(args: string[], timeout = 15_000): Promise<{ code: number; stdout: string; stderr: string } | undefined> {
+  const program = executable(true);
+  if (!program) {
+    return Promise.resolve(undefined);
+  }
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    let child: ChildProcess;
+    try {
+      const start = launch(program, args);
+      child = spawn(start.command, start.args, {
+        env: { ...process.env, NO_COLOR: "1" },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+        shell: start.shell,
+      });
+    } catch {
+      resolve(undefined);
+      return;
+    }
+    const timer = setTimeout(() => child.kill(), timeout);
+    child.stdout?.setEncoding("utf8").on("data", (data: string) => (stdout += data));
+    child.stderr?.setEncoding("utf8").on("data", (data: string) => (stderr += data));
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve(undefined);
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? (signal ? 1 : 0), stdout, stderr });
+    });
+  });
+}
+
 const capsCache = new Map<string, Promise<Caps>>();
 
 /** What the configured executable supports, read once from its help. */

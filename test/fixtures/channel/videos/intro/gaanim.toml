@@ -1,0 +1,3 @@
+name = "intro"
+kind = "video"
+entry = "main.py"

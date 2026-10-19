@@ -1,0 +1,64 @@
+{
+  "path": "{root}/videos/intro/main.py",
+  "project": {
+    "assets_dir": "{root}/videos/intro/assets",
+    "display_name": "channel › intro",
+    "entry": "{root}/videos/intro/main.py",
+    "kind": "video",
+    "language": null,
+    "manifest": "{root}/videos/intro/gaanim.toml",
+    "name": "intro",
+    "output_dir": "{root}/videos/intro/exports",
+    "root": "{root}/videos/intro"
+  },
+  "python": {
+    "interpreter": "{root}/.venv/Scripts/python.exe",
+    "paths": [
+      "{root}/videos/intro",
+      "{root}/common",
+      "{root}"
+    ],
+    "venv": "{root}/.venv"
+  },
+  "workspace": {
+    "assets": [
+      "{root}/media"
+    ],
+    "cover": null,
+    "manifest": "{root}/gaanim.toml",
+    "members": [
+      {
+        "entry": "{root}/videos/intro/main.py",
+        "error": null,
+        "group": "Videos",
+        "kind": "video",
+        "name": "intro",
+        "path": "videos/intro",
+        "root": "{root}/videos/intro"
+      },
+      {
+        "entry": null,
+        "error": "invalid project manifest \\\\?\\{root}/videos/outro/gaanim.toml: unknown project kind `nope`; available kinds: video, slides",
+        "group": "Videos",
+        "kind": null,
+        "name": "outro",
+        "path": "videos/outro",
+        "root": "{root}/videos/outro"
+      },
+      {
+        "entry": "{root}/talks/kickoff/main.py",
+        "error": null,
+        "group": "talks",
+        "kind": "slides",
+        "name": "Kickoff",
+        "path": "talks/kickoff",
+        "root": "{root}/talks/kickoff"
+      }
+    ],
+    "name": "channel",
+    "python": [
+      "{root}/common"
+    ],
+    "root": "{root}"
+  }
+}

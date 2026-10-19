@@ -11,8 +11,12 @@ export const previewChanged = new vscode.EventEmitter<string>();
 /** A project's narration script changed or was opened. */
 export const scriptChanged = new vscode.EventEmitter<string>();
 
+/** What `gaanim project` says of a file arrived, or a workspace's active member changed. */
+export const workspaceChanged = new vscode.EventEmitter<void>();
+
 export function disposeEvents(): void {
   timelineChanged.dispose();
   previewChanged.dispose();
   scriptChanged.dispose();
+  workspaceChanged.dispose();
 }

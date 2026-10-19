@@ -8,8 +8,9 @@ import * as cli from "./cli";
 import { config, ExportPreset, presetNames } from "./config";
 import { secondsArg } from "./core/clock";
 import { pointAt, segmentAt } from "./core/timeline";
+import { count, exportStart, label, Member, splitCheck, stripVerbatim, Workspace, workspaceOutput } from "./core/workspace";
 import * as inspect from "./inspect";
-import { Project, projectForDocument, projectSymbols, requireProject, slideAtCursor } from "./project";
+import { commandProject, Project, projectSymbols, requireProject, slideAtCursor } from "./project";
 
 function safe(name: string): string {
   return name.replace(/[^\w.-]/g, "_");
@@ -250,9 +251,12 @@ export async function exportPreset(name?: string, extra: string[] = [], project 
 
 /** Exports the slide under the cursor with a preset (a draft MP4 from the code action). */
 export async function exportSlide(name?: string, editor = vscode.window.activeTextEditor): Promise<void> {
-  const project = editor && projectForDocument(editor.document);
-  if (!editor || !project || editor.document.languageId !== "python") {
+  if (!editor || editor.document.languageId !== "python") {
     void vscode.window.showWarningMessage("Put the cursor on a slide in a Gaanim script.");
+    return;
+  }
+  const project = commandProject(editor.document, "Put the cursor on a slide in a Gaanim script.");
+  if (!project) {
     return;
   }
   const chosen = name ?? (await pickPreset(project, "Export the slide of", ["still", "bundle", "web"]));
@@ -268,9 +272,141 @@ export async function exportSlide(name?: string, editor = vscode.window.activeTe
   await run(project, defaultOutput(project, chosen, preset, undefined, range.name), args, preset);
 }
 
+/** The suffix a preset adds to an output's name, as `defaultOutput` names a project's. */
+function suffixFor(name: string, frame?: string): string {
+  if (name === "draft" || name === "notes" || name === "web") {
+    return `-${name}`;
+  }
+  return frame ? `-${safe(frame)}` : "";
+}
+
+/**
+ * Exports every member of a workspace (or the `members` given) with a
+ * preset, in one `gaanim export`: `{member}` in `gaanim.workspace.output`
+ * becomes each member's path, so the files repeat the workspace's layout.
+ */
+export async function exportWorkspace(workspace: Workspace, name?: string, members?: Member[]): Promise<void> {
+  const chosen =
+    name ??
+    (await vscode.window.showQuickPick(
+      presetNames(config.export.presets())
+        .filter((preset) => preset !== "web")
+        .map((preset) => ({ label: preset, description: `.${config.export.presets()[preset].ext}`, detail: config.export.presets()[preset].desc })),
+      { title: members?.length === 1 ? `Export ${label(members[0])}` : `Export the members of ${workspace.name}`, matchOnDetail: true },
+    ))?.label;
+  if (!chosen) {
+    return;
+  }
+  const preset = config.export.presets()[chosen];
+  if (!preset) {
+    void vscode.window.showErrorMessage(`Unknown export preset: ${chosen}`);
+    return;
+  }
+  const args = [...(preset.args ?? [])];
+  let frame: string | undefined;
+  const at = args.indexOf("--frame");
+  if (at !== -1) {
+    frame = args[at + 1];
+  } else if (preset.ask === "frame") {
+    // Markers differ between members: a time, or a name each one has.
+    frame = (
+      await vscode.window.showInputBox({
+        title: "Frame to export of every member",
+        prompt: "A time in seconds, or a marker, slide or stop every member has",
+        validateInput: (value) => (value.trim() === "" ? "A time or a name" : undefined),
+      })
+    )?.trim();
+    if (!frame) {
+      return;
+    }
+    args.push("--frame", frame);
+  }
+  const selected = (members ?? workspace.members).filter((member) => !member.error);
+  if (selected.length === 0) {
+    void vscode.window.showWarningMessage(`No member of ${workspace.name} to export.`);
+    return;
+  }
+  const output = workspaceOutput(workspace.root, config.workspace.output(), suffixFor(chosen, frame), preset.ext);
+  const command = ["export", workspace.root, "--output", output, ...args, "--message-format", "json"];
+  if (members) {
+    command.push("--members", selected.map((member) => member.path).join(","));
+  }
+  const key = `export:${workspace.root}`;
+  const total = selected.length;
+  const result = await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Exporting ${workspace.name}`, cancellable: true },
+    (progress, token) =>
+      new Promise<{ code: number; objects: Record<string, unknown>[]; errors: string[]; cancelled: boolean }>((resolve) => {
+        let index = 0;
+        let current: string | undefined;
+        let reported = 0;
+        const errors: string[] = [];
+        const report = (percent: number, message: string) => {
+          progress.report({ increment: Math.max(percent - reported, 0), message });
+          reported = Math.max(percent, reported);
+        };
+        report(0, count(total));
+        const job = cli.run(command, {
+          cwd: workspace.root,
+          key,
+          onJson: (object) => {
+            const message = typeof object.message === "string" ? stripVerbatim(object.message) : "";
+            if (object.type === "message" && object.label === "export" && object.level === "info") {
+              const started = exportStart(message);
+              if (started) {
+                index++;
+                current = started;
+                report(((index - 1) / total) * 100, `${started} (${index}/${total})`);
+              }
+            } else if (object.type === "progress" && typeof object.percent === "number" && current) {
+              const percent = Math.min(object.percent, 100);
+              report(((index - 1 + percent / 100) / total) * 100, `${current} ${Math.floor(percent)}% (${index}/${total})`);
+            } else if (object.type === "message" && object.level === "error") {
+              errors.push(message || "failed");
+            }
+          },
+          onExit: (code, _lines, objects) => resolve({ code, objects, errors, cancelled: token.isCancellationRequested }),
+        });
+        if (!job) {
+          resolve({ code: -1, objects: [], errors: [], cancelled: false });
+          return;
+        }
+        token.onCancellationRequested(() => cli.stop(key));
+      }),
+  );
+  if (result.cancelled) {
+    vscode.window.setStatusBarMessage(`Export of ${workspace.name} cancelled`, 4000);
+    return;
+  }
+  const summary = splitCheck(result.objects).summary;
+  const folder = path.dirname(output.slice(0, output.indexOf("{member}")) + "x");
+  const where = path.relative(workspace.root, folder) || ".";
+  if (result.code === 0) {
+    // Only offered: the export is done, so the command must not wait for an answer.
+    void vscode.window
+      .showInformationMessage(
+        `Exported ${count(summary?.passed ?? total)} of ${workspace.name} to ${where}`,
+        process.platform === "darwin" ? "Reveal in Finder" : "Reveal in File Explorer",
+      )
+      .then((choice) => {
+        if (choice) {
+          void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(folder));
+        }
+      });
+    return;
+  }
+  const text = summary ? `exported ${summary.passed} of ${count(summary.members)}` : "the export failed";
+  const last = result.errors[result.errors.length - 1];
+  void vscode.window.showErrorMessage(`✗ ${workspace.name}: ${text}${last ? ` · ${last}` : ""}`, "Show Log").then((choice) => {
+    if (choice) {
+      cli.log.show(true);
+    }
+  });
+}
+
 /** One PNG of the instant the cursor's line stands for, named after what the line is. */
 export async function stillHere(editor = vscode.window.activeTextEditor): Promise<void> {
-  const project = editor ? projectForDocument(editor.document) : requireProject();
+  const project = editor ? commandProject(editor.document, "This file is not part of a Gaanim project.") : requireProject();
   if (!project) {
     return;
   }

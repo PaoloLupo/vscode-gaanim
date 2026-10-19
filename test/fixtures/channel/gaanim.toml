@@ -1,0 +1,15 @@
+# Two members that share the Python of common/ and the files of media/.
+name = "channel"
+
+[workspace]
+members = [
+  { path = "videos/*", group = "Videos" },
+  "talks/*",
+]
+exclude = ["videos/draft"]
+
+[workspace.shared]
+python = ["common"] # default: src, if it exists
+assets = [
+  "media",
+]

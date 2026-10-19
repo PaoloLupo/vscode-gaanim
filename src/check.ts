@@ -7,7 +7,8 @@ import * as cli from "./cli";
 import { config } from "./config";
 import { fromJson, fromText, LocateContext, Problem, Report, warningRefs } from "./core/check";
 import { findSection, parseScript } from "./core/script";
-import { findSymbol, Project, projectSymbols, requireProject } from "./project";
+import { checkSummary, count, failed, Member, memberReports, stripVerbatim, Workspace } from "./core/workspace";
+import { findSymbol, loadProject, Project, projectSymbols, requireProject } from "./project";
 import { readLines, scriptPath } from "./narration";
 
 export const diagnostics = vscode.languages.createDiagnosticCollection("gaanim");
@@ -139,6 +140,105 @@ export async function run(project: Project | undefined = requireProject(), quiet
     },
   });
 }
+
+/** The project of a member, or a stand-in for one whose manifest is invalid, so its problems have a place. */
+export function memberAsProject(member: Member): Project {
+  return (
+    loadProject(member.root) ?? {
+      root: member.root,
+      target: member.root,
+      manifest: path.join(member.root, "gaanim.toml"),
+      name: member.name,
+      kind: member.kind ?? "video",
+      entry: member.entry ?? path.join(member.root, "gaanim.toml"),
+      assetsDir: path.join(member.root, "assets"),
+      outputDir: path.join(member.root, "exports"),
+      raw: {},
+    }
+  );
+}
+
+/** The last check of each workspace, by root. */
+export const lastWorkspaceReport = new Map<string, { summary: string; members: Map<string, Report> }>();
+
+/**
+ * Checks every member of a workspace (or the `members` given, paths as
+ * `--members` takes them) in one `gaanim check`: each member's problems go
+ * to its files, and a summary says how many passed.
+ */
+export async function runWorkspace(workspace: Workspace, members?: string[]): Promise<void> {
+  const args = ["check", workspace.root, "--message-format", "json"];
+  if (members && members.length > 0) {
+    args.push("--members", members.join(","));
+  }
+  if (config.check.strict()) {
+    args.push("--strict");
+  }
+  const total = members?.length || workspace.members.length;
+  const key = `check:${workspace.root}`;
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Checking ${workspace.name}`, cancellable: true },
+    (progress, token) =>
+      new Promise<void>((resolve) => {
+        let done = 0;
+        progress.report({ message: count(total) });
+        const job = cli.run(args, {
+          cwd: workspace.root,
+          key,
+          onJson: (object) => {
+            if (object.type === "check" && typeof object.member === "string") {
+              done++;
+              const glyph = failed(object) ? "✗" : object.warnings ? "!" : "✓";
+              progress.report({ increment: 100 / Math.max(total, 1), message: `${glyph} ${object.member} (${done}/${total})` });
+            }
+          },
+          onExit: (code, _lines, objects) => {
+            resolve();
+            if (token.isCancellationRequested) {
+              return;
+            }
+            const results = memberReports(workspace, objects, (member) => locateContext(memberAsProject(member)));
+            if (results.length === 0) {
+              const reason = objects.map((object) => object.message).find((message) => typeof message === "string");
+              void vscode.window
+                .showErrorMessage(`✗ ${reason ? stripVerbatim(String(reason)) : `gaanim check failed (exit ${code}); see the Gaanim log.`}`, "Show Log")
+                .then((choice) => choice && cli.log.show(true));
+              return;
+            }
+            const byMember = new Map<string, Report>();
+            for (const { member, report } of results) {
+              const project = memberAsProject(member);
+              lastReport.set(project.root, report);
+              publish(project, report);
+              byMember.set(member.path, report);
+            }
+            const summary = checkSummary(results.map(({ member, report }) => ({ member: member.path, status: report.status })));
+            lastWorkspaceReport.set(workspace.root, { summary, members: byMember });
+            const anyFailed = results.some(({ report }) => report.status === "error");
+            const reveal = config.check.revealProblems();
+            if (reveal === "always" || (reveal === "errors" && anyFailed)) {
+              void vscode.commands.executeCommand("workbench.actions.view.problems");
+            }
+            const show = anyFailed ? vscode.window.showErrorMessage : vscode.window.showInformationMessage;
+            void show(`${anyFailed ? "✗" : "✓"} ${workspace.name}: ${summary}`, "Show Problems").then((choice) => {
+              if (choice) {
+                void vscode.commands.executeCommand("workbench.actions.view.problems");
+              }
+            });
+            checked.fire(workspace.root);
+          },
+        });
+        if (!job) {
+          resolve();
+          return;
+        }
+        token.onCancellationRequested(() => cli.stop(key));
+      }),
+  );
+}
+
+/** A workspace's check finished, by root: the Projects view marks its members. */
+export const checked = new vscode.EventEmitter<string>();
 
 let timer: NodeJS.Timeout | undefined;
 

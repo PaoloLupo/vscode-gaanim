@@ -1,0 +1,8 @@
+{"type":"check","script":"{root}/videos/intro/main.py","member":"videos/intro","kind":"scene","result":"pass","errors":0,"warnings":0,"segments":0,"stops":0,"duration":1,"width":16,"height":9}
+{"type":"message","level":"error","label":"check","message":"could not load project: invalid project manifest \\\\?\\{root}/videos/outro/gaanim.toml: unknown project kind `nope`; available kinds: video, slides","file":null,"line":null,"column":null}
+{"type":"check","member":"videos/outro","result":"error"}
+{"type":"diagnostic","level":"error","message":"segment `Welcome` has zero duration","file":"{root}/talks/kickoff/main.py","line":6,"column":null}
+{"type":"diagnostic","level":"warning","message":"segment `Welcome` has no speaker notes","file":"{root}/talks/kickoff/main.py","line":6,"column":null}
+{"type":"diagnostic","level":"warning","message":"timeline is shorter than one second","file":null,"line":null,"column":null}
+{"type":"check","script":"{root}/talks/kickoff/main.py","member":"talks/kickoff","kind":"presentation","result":"fail","errors":1,"warnings":2,"segments":1,"stops":1,"duration":0,"width":16,"height":9}
+{"type":"workspace","name":"channel","members":3,"passed":1,"failed":2}
