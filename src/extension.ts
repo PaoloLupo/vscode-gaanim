@@ -125,6 +125,7 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
   subscriptions.push(
     vscode.languages.registerInlayHintsProvider(SELECTOR, new InlayHints()),
     vscode.languages.registerCodeLensProvider(SELECTOR, new CodeLenses()),
+    vscode.languages.registerCodeLensProvider({ language: "markdown", scheme: "file" }, new scriptView.ScriptLenses()),
     vscode.languages.registerHoverProvider(SELECTOR, new Hover()),
     vscode.languages.registerCodeActionsProvider(SELECTOR, new CodeActions(), { providedCodeActionKinds: CodeActions.kinds }),
     vscode.languages.registerDocumentSymbolProvider(SELECTOR, new DocumentSymbols(), { label: "Gaanim" }),
@@ -199,7 +200,13 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
 
   // Preview.
   command("gaanim.preview", () => preview.launch());
-  command("gaanim.previewHere", () => preview.here());
+  command("gaanim.previewHere", () => {
+    // In the narration script: the slide and stop of the line under the cursor.
+    const editor = vscode.window.activeTextEditor;
+    return editor && scriptView.isScriptDocument(editor.document)
+      ? scriptView.previewLine(editor.document, editor.selection.active.line + 1)
+      : preview.here();
+  });
   command("gaanim.previewOnly", () => preview.only());
   command("gaanim.follow", () => preview.follow());
   command("gaanim.live", () => live.toggle());
@@ -262,6 +269,14 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
     await scriptView.jump();
   });
   command("gaanim.lens.seek", (name: string) => preview.seek(name));
+  command("gaanim.scriptLens.preview", async (uri: vscode.Uri, line: number) =>
+    scriptView.previewLine(await vscode.workspace.openTextDocument(uri), line),
+  );
+  command("gaanim.scriptLens.code", async (uri: vscode.Uri, line: number) => {
+    await focus(uri, line);
+    await scriptView.jump();
+  });
+  command("gaanim.scriptLens.add", (name: string) => scriptView.scriptToCode([name]));
   command("gaanim.lens.loop", (name: string) => preview.loop(name === "off" ? "off" : name));
   command("gaanim.action.exportSlide", async (uri: vscode.Uri, line: number) => {
     const editor = await focus(uri, line);
@@ -362,6 +377,7 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
   };
   const onEditor = (editor: vscode.TextEditor | undefined) => {
     updateContext();
+    setContext("gaanim.inScript", Boolean(editor && scriptView.isScriptDocument(editor.document)));
     statusBar.refreshPreview();
     statusBar.refreshCursor(editor);
     statusBar.refreshMember(editor);
@@ -514,22 +530,16 @@ export function activate(context: vscode.ExtensionContext): GaanimApi {
   );
 
   // What the preview and the timeline say.
-  const shownSlide = new Map<string, string>();
   subscriptions.push(
     previewChanged.event((root) => {
       decorations.refresh(root);
       statusBar.refreshPreview();
       updateContext();
       const running = preview.status.get(root);
-      const playhead = running?.playhead;
-      if (running && playhead?.segment) {
-        const signature = `${playhead.segment}\0${playhead.stop ?? ""}`;
-        if (shownSlide.get(root) !== signature) {
-          shownSlide.set(root, signature);
-          scriptView.showSlide(running.project, playhead.segment, playhead.stop);
-        }
+      if (running?.playhead) {
+        scriptView.showPlayhead(running.project, running.playhead);
       } else if (!running) {
-        shownSlide.delete(root);
+        scriptView.forgetPlayhead(root);
       }
     }),
     timelineChanged.event((root) => {

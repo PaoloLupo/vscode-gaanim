@@ -148,6 +148,24 @@ export function sectionAt(script: Script, line: number): ScriptSection | undefin
   return found;
 }
 
+/**
+ * The 0-based chunk of its section a 1-based line is in. Chunk `n` is the
+ * text said while the slide waits at its stop `n + 1`, so a mark ends its
+ * chunk; the last chunk follows the last mark.
+ */
+export function chunkAt(section: ScriptSection, line: number): number {
+  return section.marks.filter((candidate) => candidate.line < line).length;
+}
+
+/** First and last 1-based lines of a chunk: from the mark before it (or the heading) to its own mark. */
+export function chunkLines(section: ScriptSection, chunk: number): { start: number; end: number } {
+  const index = Math.min(Math.max(chunk, 0), section.marks.length);
+  return {
+    start: index === 0 ? section.line : section.marks[index - 1].line,
+    end: section.marks[index]?.line ?? section.last,
+  };
+}
+
 /** Seconds it takes to say `words` at `wpm` words per minute. */
 export function spoken(words: number, wpm: number): number {
   return (words / Math.max(wpm, 1)) * 60;

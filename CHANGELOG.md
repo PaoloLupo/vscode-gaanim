@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+The narration script and the preview, closer to how a talk is said.
+
+- Reaching a stop no longer scrolls the script to its `[stop]` mark: the
+  preview plays through stops, and the text before the mark goes on being
+  said after it. Within a slide the script moves only where the preview
+  rests, to the text said there (on a stop, the text before its mark), and
+  only as far as it takes to show it; another slide still brings its section
+  to the top. The cursor in the code follows the same rule, so following the
+  cursor and the preview no longer pull the script two ways.
+- Lenses over each `##` heading and `[stop]` mark of the script: *Preview*
+  moves the preview to that slide or stop (an unnamed stop by its time, a
+  voiceover's section to its start) and *Code* goes to its line; a section
+  with no slide offers *Add to the code*.
+- *Preview at Cursor* in the script (`Ctrl+Alt+G P`, the editor title and
+  its context menu) moves the preview to the stop where the line is said.
+
 ## 0.15.0
 
 Gaanim workspaces: several projects in one repository that share Python

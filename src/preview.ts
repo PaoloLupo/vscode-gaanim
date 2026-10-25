@@ -494,14 +494,18 @@ export async function seek(target: string | number, project = currentProject()):
     void requireProject();
     return;
   }
-  let command: Command;
   const seconds = typeof target === "number" ? target : Number(target);
   if (typeof target === "number" || (target.trim() !== "" && !Number.isNaN(seconds))) {
-    command = { cmd: "seek", time: seconds };
+    await seekTo({ time: seconds }, project);
   } else {
     const isStop = projectSymbols(project).some((symbol) => symbol.kind === "stop" && symbol.name === target);
-    command = isStop ? { cmd: "seek", stop: target } : { cmd: "seek", segment: target };
+    await seekTo(isStop ? { stop: target } : { segment: target }, project);
   }
+}
+
+/** Rests the preview at a time, a segment, a stop, or a stop of a segment, starting the preview when it is closed. */
+export async function seekTo(where: { time?: number; segment?: string; stop?: string }, project: Project): Promise<void> {
+  const command: Command = { cmd: "seek", ...where };
   if (send(project, command)) {
     return;
   }
