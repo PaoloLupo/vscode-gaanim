@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
 
 The narration script and the preview, closer to how a talk is said.
+Numbered after Gaanim 0.17; it needs nothing newer than Gaanim 0.15.
 
 - Reaching a stop no longer scrolls the script to its `[stop]` mark: the
   preview plays through stops, and the text before the mark goes on being
