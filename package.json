@@ -448,7 +448,7 @@
       "editor/title": [
         {
           "command": "gaanim.previewHere",
-          "when": "gaanim.inProject && editorLangId == python && !gaanim.previewRunning",
+          "when": "gaanim.inProject && (editorLangId == python || gaanim.inScript) && !gaanim.previewRunning",
           "group": "navigation@1"
         },
         {
@@ -465,7 +465,7 @@
       "editor/context": [
         {
           "command": "gaanim.previewHere",
-          "when": "gaanim.inProject && editorLangId == python",
+          "when": "gaanim.inProject && (editorLangId == python || gaanim.inScript)",
           "group": "gaanim@1"
         },
         {
@@ -930,7 +930,7 @@
         "gaanim.preview.followScript": {
           "type": "boolean",
           "default": true,
-          "description": "Keep the narration script on the slide the preview shows."
+          "description": "Keep the narration script on the slide the preview shows and, where it rests, on the text said there."
         },
         "gaanim.present.duration": {
           "type": "string",

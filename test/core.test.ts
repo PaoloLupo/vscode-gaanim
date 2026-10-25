@@ -9,9 +9,23 @@ import { parseCaps } from "../src/core/caps";
 import { entries as checkEntries, fromJson, fromText, LocateContext, traceback, warningRefs } from "../src/core/check";
 import { clock, parseDuration, secondsArg, span, talkClock } from "../src/core/clock";
 import { numberAt, step } from "../src/core/nudge";
-import { findSection, mark, pace, parseScript, sectionAt, sectionInsert, spoken } from "../src/core/script";
+import { chunkAt, chunkLines, findSection, mark, pace, parseScript, sectionAt, sectionInsert, spoken } from "../src/core/script";
 import { evalNumber, parseSymbols, receiver, slideAt, STRUCTURE } from "../src/core/symbols";
-import { entries, findTimeline, hoverLines, lineLabels, location, pathKey, playsAt, pointAt, segmentAt, Timeline } from "../src/core/timeline";
+import {
+  chunkAtTime,
+  chunkSeek,
+  entries,
+  findTimeline,
+  hoverLines,
+  lineLabels,
+  location,
+  pathKey,
+  playsAt,
+  pointAt,
+  segmentAt,
+  segmentNamed,
+  Timeline,
+} from "../src/core/timeline";
 import { findPhrase, normalizeWord, TakeTiming, textWords, voiceoverBlocks } from "../src/core/takes";
 import { glyph, mathItems, scan } from "../src/core/typst";
 import { cmdQuote, launch } from "../src/core/spawn";
@@ -162,6 +176,18 @@ describe("script", () => {
     assert.equal(sectionAt(parsed, 2), undefined);
   });
 
+  it("cuts a section into the chunks said at each stop, a mark ending its chunk", () => {
+    const problem = findSection(parseScript(lines), "problem")!;
+    assert.deepEqual(
+      [13, 15, 17, 18, 20, 21].map((line) => chunkAt(problem, line)),
+      [0, 0, 0, 1, 1, 2],
+    );
+    assert.deepEqual(chunkLines(problem, 0), { start: 13, end: 17 });
+    assert.deepEqual(chunkLines(problem, 1), { start: 17, end: 20 });
+    assert.deepEqual(chunkLines(problem, 2), { start: 20, end: 20 }, "after the last mark");
+    assert.deepEqual(chunkLines(problem, 9), chunkLines(problem, 2));
+  });
+
   it("adds a missing section after the slide before it, with its stops", () => {
     const script = ["# Script", "", "## Cover", "Hi.", "", "## Closing", "Bye."];
     const insert = sectionInsert(script, ["Cover", "Problem", "Closing"], "Problem", ["question", ""]);
@@ -244,6 +270,29 @@ describe("timeline", () => {
     assert.deepEqual(location(data, "Problem", "question"), { file: data.segments[1].file, line: 23 });
     assert.deepEqual(location(data, "Problem", ""), { file: data.segments[1].file, line: 25 });
     assert.equal(location(data, "Nope"), undefined);
+    assert.equal(segmentNamed(data, "problem")?.name, "Problem");
+    assert.equal(segmentNamed(data, "Nope"), undefined);
+  });
+
+  it("knows the chunk of script said where the preview rests", () => {
+    const problem = segmentNamed(data, "Problem")!;
+    assert.equal(chunkAtTime(problem, 0.8), 0, "before the first stop");
+    assert.equal(chunkAtTime(problem, 1.3), 0, "on a stop, the text before its mark");
+    assert.equal(chunkAtTime(problem, 1.31), 0, "within a frame of it");
+    assert.equal(chunkAtTime(problem, 1.5), 1, "between stops, the text before the next mark");
+    assert.equal(chunkAtTime(problem, 1.8), 1, "on the last stop, at the segment's end");
+    assert.equal(chunkAtTime({ ...problem, end: 2.5 }, 2), 2, "past the last stop");
+  });
+
+  it("rests the preview where a chunk of script is said", () => {
+    const problem = segmentNamed(data, "Problem")!;
+    assert.deepEqual(chunkSeek(problem, 0), { segment: "Problem", stop: "question" });
+    const unnamed = chunkSeek(problem, 1);
+    assert.ok(unnamed.time! < problem.end && Math.abs(unnamed.time! - 1.8) < 0.01, "an unnamed stop at the end stays in the segment");
+    assert.deepEqual(chunkSeek({ ...problem, end: 2.5 }, 1), { time: 1.8 });
+    assert.ok(Math.abs(chunkSeek({ ...problem, end: 2.5 }, 2).time! - 2.5) < 0.01, "past the last stop, its end");
+    assert.deepEqual(chunkSeek({ ...problem, stops: [] }, 0), { segment: "Problem" });
+    assert.equal(chunkAtTime(problem, unnamed.time!), 1, "and rests on the chunk it went to");
   });
 
   it("labels lines with their times", () => {

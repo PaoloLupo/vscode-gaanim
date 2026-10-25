@@ -15,7 +15,7 @@ Code, and uses Gaanim's editor channel (`--listen`), JSON messages,
 | **Gaanim: New Project…** | `gaanim init` a slides or video project and open it |
 | **Gaanim: New Workspace…** | `gaanim init workspace`: several projects that share code, assets and Python |
 | **Gaanim: Check All Members** | one `gaanim check` of the workspace, each member's problems on its lines |
-| **Gaanim: Preview at Cursor** | the preview rests at the instant of the cursor's line, without a restart |
+| **Gaanim: Preview at Cursor** | the preview rests at the instant of the cursor's line, without a restart; in the script, at the stop where the line is said |
 | **Gaanim: Toggle Preview Follows Cursor** | the preview follows the cursor through the code |
 | **Gaanim: Toggle Live Mode** | saves as you type, so every change reaches the preview |
 | **Gaanim: Toggle Loop of the Slide at Cursor** | plays the slide over and over, across reloads |
@@ -56,11 +56,15 @@ Code, and uses Gaanim's editor channel (`--listen`), JSON messages,
   Gaanim's own *Open in the editor* (inspector, console, animation timeline,
   error panel, *Open and complete*) opens the line in this window.
 - **Narration script.** The script beside the code follows the slide under
-  the cursor, or the slide the preview shows while you present. *Go Between
-  Slide and Its Script* jumps both ways and adds a missing section with a
-  `[stop]` mark per stop. Each section shows how long it takes to say against
-  its slide's `target=` (green, amber, red), and the title the whole talk
-  against `scene.slides.target()`.
+  the cursor, or the slide the preview shows. Where the cursor or the preview
+  rests it shows the text said there (on a stop, the text before its mark);
+  while the preview plays through a slide's stops it stays put, since that
+  text goes on being said after the stop. Lenses over each `##` heading and
+  `[stop]` mark move the preview to that slide or stop, or go to its code.
+  *Go Between Slide and Its Script* jumps both ways and adds a missing
+  section with a `[stop]` mark per stop. Each section shows how long it takes
+  to say against its slide's `target=` (green, amber, red), and the title the
+  whole talk against `scene.slides.target()`.
 - **Exports** with a cancellable progress bar in percent: MP4, draft,
   production, WebM, MOV, GIF, WebP, PDF, PDF with notes, `.gaanim` bundle, a
   bundle made lighter for the web (`gaanim pack --web`), and stills.

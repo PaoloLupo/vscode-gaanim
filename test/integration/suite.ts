@@ -176,6 +176,33 @@ export async function run(): Promise<void> {
     assert.ok(new RegExp(`^## ${first.name}$`, "mi").test(script.document.getText()), script.document.getText());
   });
 
+  step("the script's lenses move the preview to a stop and go to its code", async () => {
+    const script = await until("the script editor", () =>
+      vscode.window.visibleTextEditors.find((candidate) => candidate.document.fileName.endsWith("script.md")),
+    );
+    const lenses = await until("the script's lenses", async () => {
+      const found = await vscode.commands.executeCommand<vscode.CodeLens[]>("vscode.executeCodeLensProvider", script.document.uri);
+      return found.some((lens) => lens.command?.command === "gaanim.scriptLens.preview") ? found : undefined;
+    });
+    const lines = script.document.getText().split(/\r?\n/);
+    const heading = lines.findIndex((line) => line.trim().toLowerCase() === `## ${first.name.toLowerCase()}`);
+    // The first slide's first mark when it has stops, else its heading.
+    const mark = first.stops?.length ? lines.findIndex((line, index) => index > heading && /^\[stop\b/i.test(line.trim())) : heading;
+    const at = (command: string) => lenses.find((lens) => lens.range.start.line === mark && lens.command?.command === command)!.command!;
+    const preview = at("gaanim.scriptLens.preview");
+    await vscode.commands.executeCommand(preview.command, ...preview.arguments!);
+    const playhead = await until("a playhead from the script", () => api.previews.get(root)?.playhead, 120_000);
+    if (real) {
+      assert.equal(playhead.segment, first.name);
+    }
+    const code = at("gaanim.scriptLens.code");
+    await vscode.commands.executeCommand(code.command, ...code.arguments!);
+    const active = await until("the code", () =>
+      vscode.window.activeTextEditor?.document.fileName.endsWith("main.py") ? vscode.window.activeTextEditor : undefined,
+    );
+    assert.equal(active.selection.active.line + 1, first.stops?.length ? first.stops[0].line : first.line);
+  });
+
   let failed = 0;
   for (const [name, runStep] of steps) {
     try {

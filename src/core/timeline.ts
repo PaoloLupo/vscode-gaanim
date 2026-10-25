@@ -153,6 +153,48 @@ export function location(data: Timeline, segment?: string, stop?: string): { fil
   return undefined;
 }
 
+/** The segment of a name, ignoring case like Gaanim; among namesakes, the one around `time`. */
+export function segmentNamed(data: Timeline, name: string, time?: number): TimelineSegment | undefined {
+  const wanted = name.toLowerCase();
+  const matches = (data.segments ?? []).filter((segment) => segment.name.toLowerCase() === wanted);
+  const around = time === undefined ? undefined : matches.find((segment) => segment.start <= time + 1e-6 && time <= segment.end + 1e-6);
+  return around ?? matches[0];
+}
+
+/** How near a stop the preview counts as resting on it: about a frame. */
+const ON_STOP = 0.02;
+
+/**
+ * The chunk of a segment's script said where the preview rests at `time`
+ * (see `chunkAt`): on its stop `n`, the text before mark `n`; between two
+ * stops, the text before the next one's mark; past the last stop, what
+ * follows the last mark.
+ */
+export function chunkAtTime(segment: TimelineSegment, time: number): number {
+  const stops = segment.stops ?? [];
+  const next = stops.findIndex((stop) => stop.time >= time - ON_STOP);
+  return next === -1 ? stops.length : next;
+}
+
+/**
+ * The `seek` that rests the preview where a chunk of a segment's script is
+ * said: on its stop, by name when it has one, else by time; past the last
+ * stop, just before the segment ends. Times stay inside the segment: its end
+ * is the next one's start.
+ */
+export function chunkSeek(segment: TimelineSegment, chunk: number): { segment?: string; stop?: string; time?: number } {
+  const inside = (time: number) => Math.max(segment.start, Math.min(time, segment.end - 1e-3));
+  const stop = segment.stops?.[chunk];
+  if (stop?.name) {
+    return { segment: segment.name, stop: stop.name };
+  }
+  if (stop) {
+    return { time: inside(stop.time) };
+  }
+  // A segment without stops already rests at its end.
+  return chunk === 0 ? { segment: segment.name } : { time: inside(segment.end) };
+}
+
 export interface Icons {
   segment: string;
   section: string;
